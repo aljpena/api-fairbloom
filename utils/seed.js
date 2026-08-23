@@ -3,15 +3,6 @@ const mongoose = require("mongoose");
 const connectDB = require("../config/db");
 const User = require("../models/User");
 
-/**
- * Creates (or updates) the initial admin account.
- * Run with: npm run seed
- *
- * Admin accounts are intentionally NOT exposed through the public
- * /api/auth/register endpoint — they're provisioned here instead,
- * matching the manuscript's design where the researchers act as the
- * system administrators during the study period.
- */
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@fairbloom.local";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ChangeMe123!";
 

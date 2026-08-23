@@ -32,4 +32,26 @@ const loginValidation = [
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
-module.exports = { registerValidation, loginValidation };
+const listingValidation = [
+  body("type").isIn(["sell", "request"]).withMessage("Type must be 'sell' or 'request'"),
+  body("flowerVariety").trim().notEmpty().withMessage("Flower variety is required"),
+  body("quantity").isFloat({ min: 1 }).withMessage("Quantity must be at least 1"),
+  body("pricePerUnit")
+    .optional({ nullable: true })
+    .isFloat({ min: 0 })
+    .withMessage("Price per unit must be a positive number"),
+  body("location")
+    .isIn(["Beckel", "Bahong", "Ambiong", "Bineng", "Tublay", "Sablan", "Baguio City", "La Trinidad"])
+    .withMessage("A valid location is required"),
+  body("description").optional().isLength({ max: 500 }).withMessage("Description too long (max 500 chars)"),
+];
+
+const transactionValidation = [
+  body("flowerVariety").trim().notEmpty().withMessage("Flower variety is required"),
+  body("price").isFloat({ min: 0.01 }).withMessage("Price must be greater than 0"),
+  body("volume").isFloat({ min: 0.01 }).withMessage("Volume must be greater than 0"),
+  body("location").optional().trim(),
+];
+
+module.exports = { registerValidation, loginValidation, listingValidation, transactionValidation };
+

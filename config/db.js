@@ -20,11 +20,8 @@ const connectDB = async () => {
 
   try {
     const conn = await mongoose.connect(uri, {
-      // These options are safe defaults for modern Mongoose (v8+),
-      // most of the old connection flags are no longer needed,
-      // but we set a few explicitly for reliability on flaky networks.
-      serverSelectionTimeoutMS: 15000, // fail fast instead of hanging forever
-      family: 4, // force IPv4, avoids some ISP IPv6 resolution issues
+      serverSelectionTimeoutMS: 15000,
+      family: 4,
     });
 
     console.log(`[FairBloom] MongoDB connected: ${conn.connection.host}`);

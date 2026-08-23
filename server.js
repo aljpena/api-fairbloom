@@ -30,6 +30,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
+
 // Basic rate limiting (protects auth + submission endpoints from abuse)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -45,11 +46,11 @@ app.get("/api/health", (req, res) => {
 });
 
 // ---- Routes (uncomment as you build each module) ----
-// app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/listings", require("./routes/listingRoutes"));
 // app.use("/api/users", require("./routes/userRoutes"));
-// app.use("/api/listings", require("./routes/listingRoutes"));
-// app.use("/api/pricing", require("./routes/pricingRoutes"));
-// app.use("/api/transactions", require("./routes/transactionRoutes"));
+app.use("/api/pricing", require("./routes/pricingRoutes"));
+app.use("/api/transactions", require("./routes/transactionRoutes"));
 // app.use("/api/messages", require("./routes/messageRoutes"));
 // app.use("/api/admin", require("./routes/adminRoutes"));
 
