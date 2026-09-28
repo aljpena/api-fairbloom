@@ -12,13 +12,11 @@ const connectDB = require("./config/db");
 const app = express();
 const server = http.createServer(app);
 
-// ---- Allowed origins (admin panel dev server, mobile app dev server) ----
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
-// ---- Core middleware ----
 app.use(helmet());
 app.use(
   cors({
@@ -30,8 +28,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
-
-// Basic rate limiting (protects auth + submission endpoints from abuse)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 300,
@@ -40,26 +36,22 @@ const apiLimiter = rateLimit({
 });
 app.use("/api", apiLimiter);
 
-// ---- Health check ----
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "FairBloom API", time: new Date().toISOString() });
 });
 
-// ---- Routes (uncomment as you build each module) ----
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/listings", require("./routes/listingRoutes"));
 // app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/pricing", require("./routes/pricingRoutes"));
 app.use("/api/transactions", require("./routes/transactionRoutes"));
-// app.use("/api/messages", require("./routes/messageRoutes"));
 // app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/conversations", require("./routes/conversationRoutes"));
 
-// ---- 404 handler ----
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// ---- Global error handler ----
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({
@@ -73,6 +65,7 @@ const io = new Server(server, {
     origin: allowedOrigins.length ? allowedOrigins : "*",
   },
 });
+require("./utils/socket").setIO(io);
 
 io.on("connection", (socket) => {
   console.log(`[FairBloom] Socket connected: ${socket.id}`);
@@ -92,7 +85,6 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-// ---- Start server after DB connects ----
 connectDB().then(() => {
   server.listen(PORT, () => {
     console.log(`[FairBloom] Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`);

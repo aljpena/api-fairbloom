@@ -19,7 +19,7 @@ const getPriceForVariety = async (req, res) => {
     since.setDate(since.getDate() - days);
 
     const transactions = await Transaction.find({
-      flowerVariety: { $regex: `^${flowerVariety}$`, $options: "i" }, // exact match, case-insensitive
+      flowerVariety: { $regex: `^${flowerVariety}$`, $options: "i" },
       status: "approved",
       createdAt: { $gte: since },
     }).select("price volume");

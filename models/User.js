@@ -14,14 +14,14 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Farmer-specific
+    // Farmer specific
     farmLocation: {
       type: String,
       enum: ["Beckel", "Bahong", "Ambiong", "Bineng", "Tublay", "Sablan", null],
       default: null,
     },
 
-    // Buyer-specific
+    // Buyer specific
     buyerCategory: {
       type: String,
       enum: ["Retail Florist", "Funeral Home", "Church/Institution", null],
@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Submission-limit anti-fraud control (see manuscript's 4-layer defense)
+    // Submission limit anti fraud control (4-layer defense)
     submissionCount: { type: Number, default: 0 },
     lastSubmissionAt: { type: Date, default: null },
 

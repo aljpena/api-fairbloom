@@ -2,8 +2,8 @@ const mongoose = require("mongoose");
 
 /**
  * A single model covers both:
- *  - type "sell"    -> farmer posting flowers they have available
- *  - type "request" -> buyer posting what they need
+ *  - sell-farmer posting flowers they have available
+ *  - request-buyer posting what they need
  * This keeps browsing/search/filter logic unified (Functional
  * Requirements 4 & 5 in the manuscript).
  */

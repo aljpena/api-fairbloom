@@ -75,7 +75,6 @@ const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // password has `select: false` in the schema, so explicitly include it
     const user = await User.findOne({ email }).select("+password");
 
     if (!user || !(await user.comparePassword(password))) {
@@ -112,7 +111,6 @@ const login = async (req, res) => {
  * @access  Private (requires valid JWT)
  */
 const getMe = async (req, res) => {
-  // req.user is already attached by the `protect` middleware
   res.json({ user: req.user });
 };
 

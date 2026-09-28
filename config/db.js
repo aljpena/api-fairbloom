@@ -42,7 +42,6 @@ const connectDB = async () => {
   }
 };
 
-// Log runtime connection state changes (useful during development/demo)
 mongoose.connection.on("disconnected", () => {
   console.warn("[FairBloom] MongoDB disconnected.");
 });

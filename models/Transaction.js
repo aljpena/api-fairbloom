@@ -3,14 +3,14 @@ const mongoose = require("mongoose");
 /**
  * Each submitted transaction (price + volume) feeds the Real-Time Pricing
  * Index. VWAP = Sum(price * volume) / Sum(volume), computed per flower
- * variety over a rolling window (e.g. last N days) in the pricing service.
+ * variety over a window in the pricing service.
  */
 const transactionSchema = new mongoose.Schema(
   {
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     flowerVariety: { type: String, required: true, trim: true },
 
-    price: { type: Number, required: true, min: 0 }, // price per dozen (₱)
+    price: { type: Number, required: true, min: 0 }, // price per dozen
     volume: { type: Number, required: true, min: 0 }, // dozens sold
 
     location: { type: String, trim: true },
