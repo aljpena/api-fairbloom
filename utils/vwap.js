@@ -8,6 +8,7 @@
  * @returns {{ vwap: number|null, totalVolume: number, totalValue: number, transactionCount: number }}
  *   vwap is null when there's no volume to divide by (no transactions).
  */
+const DEFAULT_WINDOW_DAYS = 30;
 function calculateVWAP(transactions) {
   let totalValue = 0; // Sum(price * volume)
   let totalVolume = 0; // Sum(volume)
@@ -27,4 +28,4 @@ function calculateVWAP(transactions) {
   };
 }
 
-module.exports = { calculateVWAP };
+module.exports = { calculateVWAP, DEFAULT_WINDOW_DAYS };

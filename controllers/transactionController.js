@@ -1,7 +1,7 @@
 const { validationResult } = require("express-validator");
 const Transaction = require("../models/Transaction");
 const User = require("../models/User");
-const { calculateVWAP } = require("../utils/vwap");
+const { calculateVWAP, DEFAULT_WINDOW_DAYS } = require("../utils/vwap");
 
 /**
  * Returns true if `lastDate` falls on a different calendar day than "now"
@@ -53,9 +53,13 @@ const submitTransaction = async (req, res) => {
     }
 
     //Layer 3: automated boundary validation against current VWAP
+    const since = new Date();
+    since.setDate(since.getDate() - DEFAULT_WINDOW_DAYS);
+
     const existing = await Transaction.find({
       flowerVariety: { $regex: `^${flowerVariety}$`, $options: "i" },
       status: "approved",
+      createdAt: { $gte: since },
     }).select("price volume");
 
     const { vwap: currentVWAP } = calculateVWAP(existing);
