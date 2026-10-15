@@ -46,4 +46,7 @@ async function sendOtpEmail(to, name, otp, expiryMinutes) {
   });
 }
 
-module.exports = { sendOtpEmail };
+/** Create the pooled connection at startup so the first signup is not slow. */
+const warmUpEmail = () => void getTransporter();
+
+module.exports = { sendOtpEmail, warmUpEmail };

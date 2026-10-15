@@ -99,21 +99,17 @@ const register = async (req, res) => {
     const otp = issueOtp(user);
     await user.save();
 
-    try {
-      await sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES);
-    } catch (mailErr) {
-      console.error("[FairBloom] Send OTP email failed:", mailErr.message);
-      return res.status(502).json({
-        message: "Account created, but we couldn't send the verification email. Please tap 'Resend code'.",
-        email: user.email,
-      });
-    }
-
     res.status(201).json({
       message: "Account created. Enter the 6-digit code we emailed you to verify.",
       email: user.email,
       expiresInMinutes: OTP_EXPIRY_MINUTES,
     });
+
+    // Send AFTER responding: the SMTP round-trip (1-5s) must not keep the user waiting on the
+    // sign-up screen. If it fails, the app's "Resend code" button recovers.
+    sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES).catch((mailErr) =>
+      console.error("[FairBloom] Send OTP email failed:", mailErr.message),
+    );
   } catch (err) {
     console.error("[FairBloom] Register error:", err.message);
     res.status(500).json({ message: "Server error during registration" });
@@ -208,14 +204,11 @@ const resendOtp = async (req, res) => {
     const otp = issueOtp(user);
     await user.save();
 
-    try {
-      await sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES);
-    } catch (mailErr) {
-      console.error("[FairBloom] Resend OTP email failed:", mailErr.message);
-      return res.status(502).json({ message: "We couldn't send the email. Please try again shortly." });
-    }
-
     res.json(genericReply);
+
+    sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES).catch((mailErr) =>
+      console.error("[FairBloom] Resend OTP email failed:", mailErr.message),
+    );
   } catch (err) {
     console.error("[FairBloom] Resend OTP error:", err.message);
     res.status(500).json({ message: "Server error resending code" });

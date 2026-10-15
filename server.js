@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
+const { warmUpEmail } = require("./utils/sendEmail");
 const User = require("./models/User");
 const Conversation = require("./models/Conversation");
 const { setIO } = require("./utils/socket");
@@ -127,6 +128,7 @@ const PORT = process.env.PORT || 5000;
 
 // ---- Start server after DB connects ----
 connectDB().then(() => {
+  warmUpEmail();
   server.listen(PORT, () => {
     console.log(`[FairBloom] Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
   });
