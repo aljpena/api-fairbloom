@@ -14,14 +14,14 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Farmer specific
+    // Farmer-specific
     farmLocation: {
       type: String,
       enum: ["Beckel", "Bahong", "Ambiong", "Bineng", "Tublay", "Sablan", null],
       default: null,
     },
 
-    // Buyer specific
+    // Buyer-specific
     buyerCategory: {
       type: String,
       enum: ["Retail Florist", "Funeral Home", "Church/Institution", null],
@@ -33,7 +33,14 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Submission limit anti fraud control (4-layer defense)
+    // Email verification (OTP)
+    isEmailVerified: { type: Boolean, default: false },
+    otpHash: { type: String, select: false },
+    otpExpiresAt: { type: Date, select: false },
+    otpAttempts: { type: Number, default: 0, select: false },
+    otpLastSentAt: { type: Date, select: false },
+
+    // Submission-limit anti-fraud control
     submissionCount: { type: Number, default: 0 },
     lastSubmissionAt: { type: Date, default: null },
 
@@ -42,7 +49,6 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);

@@ -1,7 +1,5 @@
 const Transaction = require("../models/Transaction");
-const { calculateVWAP } = require("../utils/vwap");
-
-const DEFAULT_WINDOW_DAYS = 30;
+const { calculateVWAP, DEFAULT_WINDOW_DAYS } = require("../utils/vwap");
 
 /**
  * @route   GET /api/pricing/:flowerVariety

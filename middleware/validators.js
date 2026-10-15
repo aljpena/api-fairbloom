@@ -53,5 +53,21 @@ const transactionValidation = [
   body("location").optional().trim(),
 ];
 
-module.exports = { registerValidation, loginValidation, listingValidation, transactionValidation };
+const verifyEmailValidation = [
+  body("email").isEmail().withMessage("A valid email is required").normalizeEmail(),
+  body("otp").trim().matches(/^\d{6}$/).withMessage("Code must be exactly 6 digits"),
+];
+
+const resendOtpValidation = [
+  body("email").isEmail().withMessage("A valid email is required").normalizeEmail(),
+];
+
+module.exports = {
+  registerValidation,
+  loginValidation,
+  listingValidation,
+  transactionValidation,
+  verifyEmailValidation,
+  resendOtpValidation,
+};
 
