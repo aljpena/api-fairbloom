@@ -1,10 +1,3 @@
-/**
- * server.js creates the Socket.IO `io` instance and calls setIO(io) once,
- * right after creating it. Controllers that need to broadcast a message
- * call getIO() at request-time (not at load-time), which sidesteps the
- * circular-require problem you'd get from a controller doing
- * `require("../server")` directly.
- */
 let io = null;
 
 const setIO = (ioInstance) => {
@@ -13,4 +6,14 @@ const setIO = (ioInstance) => {
 
 const getIO = () => io;
 
-module.exports = { setIO, getIO };
+// Forcibly closes every live socket belonging to a user.
+const disconnectUser = (userId) => {
+  if (!io) return;
+  for (const [, socket] of io.sockets.sockets) {
+    if (socket.user && String(socket.user._id) === String(userId)) {
+      socket.disconnect(true);
+    }
+  }
+};
+
+module.exports = { setIO, getIO, disconnectUser };

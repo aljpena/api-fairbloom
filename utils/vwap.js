@@ -1,31 +1,30 @@
-/**
- * Volume-Weighted Average Price
- *
- *   VWAP = Sum(price_i * volume_i) / Sum(volume_i)
- *
- *
- * @param {Array<{price: number, volume: number}>} transactions
- * @returns {{ vwap: number|null, totalVolume: number, totalValue: number, transactionCount: number }}
- *   vwap is null when there's no volume to divide by (no transactions).
- */
+// Rolling window (in days) used by the public index, the fraud check, and listings.
 const DEFAULT_WINDOW_DAYS = 30;
+
+/**
+ * VWAP = Sum(price * volume) / Sum(volume)
+ * The one place the formula lives; everything else calls this.
+ */
+function vwapFromTotals(totalValue, totalVolume) {
+  if (!(totalVolume > 0)) return null;
+  return Math.round((totalValue / totalVolume) * 100) / 100;
+}
+
 function calculateVWAP(transactions) {
-  let totalValue = 0; // Sum(price * volume)
-  let totalVolume = 0; // Sum(volume)
+  let totalValue = 0;
+  let totalVolume = 0;
 
   for (const t of transactions) {
     totalValue += t.price * t.volume;
     totalVolume += t.volume;
   }
 
-  const vwap = totalVolume > 0 ? totalValue / totalVolume : null;
-
   return {
-    vwap: vwap !== null ? Math.round(vwap * 100) / 100 : null, // round to 2 decimals
+    vwap: vwapFromTotals(totalValue, totalVolume),
     totalVolume,
     totalValue,
     transactionCount: transactions.length,
   };
 }
 
-module.exports = { calculateVWAP, DEFAULT_WINDOW_DAYS };
+module.exports = { calculateVWAP, vwapFromTotals, DEFAULT_WINDOW_DAYS };

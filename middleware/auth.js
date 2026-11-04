@@ -1,10 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-/**
- * Verifies the JWT from the Authorization header ("Bearer <token>")
- * and attaches the authenticated user (minus password) to req.user.
- */
 const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -21,6 +17,11 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: "Not authorized, user not found or deactivated" });
     }
 
+    // iat is in seconds. A token issued before the last password change is dead.
+    if (user.passwordChangedAt && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+      return res.status(401).json({ message: "Password was changed, please log in again" });
+    }
+
     req.user = user;
     next();
   } catch (err) {
@@ -31,10 +32,6 @@ const protect = async (req, res, next) => {
   }
 };
 
-/**
- * Restricts a route to specific roles.
- * Usage: router.get("/admin-only", protect, authorize("admin"), handler)
- */
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {

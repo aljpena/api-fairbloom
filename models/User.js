@@ -8,11 +8,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
 
-    role: {
-      type: String,
-      enum: ["farmer", "buyer", "admin"],
-      required: true,
-    },
+    role: { type: String, enum: ["farmer", "buyer", "admin"], required: true },
 
     // Farmer-specific
     farmLocation: {
@@ -40,11 +36,17 @@ const userSchema = new mongoose.Schema(
     otpAttempts: { type: Number, default: 0, select: false },
     otpLastSentAt: { type: Date, select: false },
 
-    // Submission-limit anti-fraud control
+    // Anti-fraud submission cap
     submissionCount: { type: Number, default: 0 },
     lastSubmissionAt: { type: Date, default: null },
 
+    // Account status (admin-managed)
     isActive: { type: Boolean, default: true },
+    deactivatedAt: { type: Date },
+    deactivatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    // Tokens issued before this moment are rejected (set when the password changes)
+    passwordChangedAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -53,6 +55,7 @@ userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  if (!this.isNew) this.passwordChangedAt = new Date();
   next();
 });
 

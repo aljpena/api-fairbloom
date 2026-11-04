@@ -55,6 +55,9 @@ app.use("/api/listings", require("./routes/listingRoutes"));
 app.use("/api/transactions", require("./routes/transactionRoutes"));
 app.use("/api/pricing", require("./routes/pricingRoutes"));
 app.use("/api/conversations", require("./routes/conversationRoutes"));
+app.use("/api/deals", require("./routes/dealRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 
 // ---- 404 handler ----
 app.use((req, res) => {
@@ -87,7 +90,9 @@ io.use(async (socket, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
     if (!user || !user.isActive) return next(new Error("Authentication failed"));
-
+    if (user.passwordChangedAt && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+      return next(new Error("Authentication failed"));
+    }
     socket.user = user; // available in every handler below
     next();
   } catch (err) {

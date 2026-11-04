@@ -1,33 +1,31 @@
-const Transaction = require("../models/Transaction");
-const { calculateVWAP, DEFAULT_WINDOW_DAYS } = require("../utils/vwap");
+const { getVwap, getVwapMap } = require("../utils/priceIndex");
+const { DEFAULT_WINDOW_DAYS } = require("../utils/vwap");
+const { VARIETIES } = require("../config/varieties");
 
-/**
- * @route   GET /api/pricing/:flowerVariety
- * @desc    Get the current VWAP-based price for one flower variety,
- *          computed from approved transactions in a rolling window.
- *          Query param ?days=N overrides the default 30-day window.
- * @access  Public
- */
+const getDays = (req) => {
+  const n = Number(req.query.days);
+  return Number.isFinite(n) && n > 0 && n <= 365 ? n : DEFAULT_WINDOW_DAYS;
+};
+
+/** @route GET /api/pricing/varieties  (public) */
+const getVarieties = (req, res) => {
+  res.json({ varieties: VARIETIES });
+};
+
+/** @route GET /api/pricing/:flowerVariety  (public) */
 const getPriceForVariety = async (req, res) => {
   try {
     const { flowerVariety } = req.params;
-    const days = Number(req.query.days) || DEFAULT_WINDOW_DAYS;
-
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-
-    const transactions = await Transaction.find({
-      flowerVariety: { $regex: `^${flowerVariety}$`, $options: "i" },
-      status: "approved",
-      createdAt: { $gte: since },
-    }).select("price volume");
-
-    const result = calculateVWAP(transactions);
+    const days = getDays(req);
+    const row = await getVwap(flowerVariety, days);
 
     res.json({
       flowerVariety,
       windowDays: days,
-      ...result,
+      vwap: row ? row.vwap : null,
+      totalVolume: row ? row.totalVolume : 0,
+      totalValue: row ? row.totalValue : 0,
+      transactionCount: row ? row.transactionCount : 0,
     });
   } catch (err) {
     console.error("[FairBloom] Get price error:", err.message);
@@ -35,37 +33,13 @@ const getPriceForVariety = async (req, res) => {
   }
 };
 
-/**
- * @route   GET /api/pricing
- * @desc    Get the current VWAP-based price for every flower variety
- *          that has at least one approved transaction in the window.
- * @access  Public
- */
+/** @route GET /api/pricing  (public) */
 const getAllPrices = async (req, res) => {
   try {
-    const days = Number(req.query.days) || DEFAULT_WINDOW_DAYS;
-    const since = new Date();
-    since.setDate(since.getDate() - days);
+    const days = getDays(req);
+    const map = await getVwapMap(days);
 
-    const varieties = await Transaction.distinct("flowerVariety", {
-      status: "approved",
-      createdAt: { $gte: since },
-    });
-
-    const index = await Promise.all(
-      varieties.map(async (flowerVariety) => {
-        const transactions = await Transaction.find({
-          flowerVariety,
-          status: "approved",
-          createdAt: { $gte: since },
-        }).select("price volume");
-
-        return { flowerVariety, ...calculateVWAP(transactions) };
-      })
-    );
-
-    index.sort((a, b) => a.flowerVariety.localeCompare(b.flowerVariety));
-
+    const index = [...map.values()].sort((a, b) => a.flowerVariety.localeCompare(b.flowerVariety));
     res.json({ windowDays: days, index });
   } catch (err) {
     console.error("[FairBloom] Get all prices error:", err.message);
@@ -73,4 +47,4 @@ const getAllPrices = async (req, res) => {
   }
 };
 
-module.exports = { getPriceForVariety, getAllPrices };
+module.exports = { getPriceForVariety, getAllPrices, getVarieties };
