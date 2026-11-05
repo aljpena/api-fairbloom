@@ -5,20 +5,22 @@ const Message = require("../models/Message");
 const Deal = require("../models/Deal");
 const Transaction = require("../models/Transaction");
 const Erasure = require("../models/Erasure");
+const File = require("../models/File");
+const Notification = require("../models/Notification");
+const PushToken = require("../models/PushToken");
 const { disconnectUser } = require("./socket");
 
 /**
  * Permanently erases one participant.
  *
- *  Always deleted : the account, their listings, their conversations
- *                   (including the other person's messages in them) and deals.
+ *  Always deleted : the account, their listings, conversations (including the
+ *                   other person's messages in them), deals, uploaded files
+ *                   (ID photo, chat images), notifications and push tokens.
  *  Transactions   : "anonymize" keeps price/volume/variety/date but removes every
  *                   link to the person, so the price index is unchanged.
- *                   "delete" removes the transactions entirely, so the index
- *                   changes accordingly.
+ *                   "delete" removes them entirely, so the index changes.
  *
  * Safe to run twice: if it was interrupted, running it again finishes the job.
- * Returns null if the user doesn't exist, otherwise a report of counts (no personal data).
  */
 async function eraseUser(userId, { transactions, source = "admin", skipLedger = false }) {
   if (!["anonymize", "delete"].includes(transactions)) {
@@ -49,9 +51,11 @@ async function eraseUser(userId, { transactions, source = "admin", skipLedger = 
   ).map((d) => d._id);
 
   const report = {};
+  let deletedTxIds = [];
 
   // 3. Transactions
   if (transactions === "delete") {
+    deletedTxIds = (await Transaction.find(involved).select("_id").lean()).map((t) => t._id);
     report.transactionsDeleted = (await Transaction.deleteMany(involved)).deletedCount;
   } else {
     report.transactionsAnonymized = await Transaction.countDocuments(involved);
@@ -61,7 +65,24 @@ async function eraseUser(userId, { transactions, source = "admin", skipLedger = 
     await Transaction.updateMany({ deal: { $in: dealIds } }, { $set: { deal: null } });
   }
 
-  // 4. Deals, messages, conversations, listings, then the account itself
+  // 4. Files, notifications and push tokens
+  report.filesDeleted = (
+    await File.deleteMany({ $or: [{ owner: userId }, { conversation: { $in: convoIds } }] })
+  ).deletedCount;
+  report.notificationsDeleted = (
+    await Notification.deleteMany({
+      $or: [
+        { user: userId },
+        { subject: userId },
+        { conversation: { $in: convoIds } },
+        { deal: { $in: dealIds } },
+        { transaction: { $in: deletedTxIds } },
+      ],
+    })
+  ).deletedCount;
+  await PushToken.deleteMany({ user: userId });
+
+  // 5. Deals, messages, conversations, listings, then the account itself
   report.dealsDeleted = (
     await Deal.deleteMany({ $or: [{ _id: { $in: dealIds } }, { conversation: { $in: convoIds } }] })
   ).deletedCount;
@@ -78,19 +99,22 @@ async function eraseUser(userId, { transactions, source = "admin", skipLedger = 
 }
 
 /**
- * Wipes ALL participant data and keeps admin accounts. Use after UAT so that
- * "test data is purged immediately after UAT completion" is literally true.
+ * Wipes ALL participant data and keeps admin accounts. Use after UAT.
  */
 async function purgeAllParticipantData() {
-  const [users, listings, transactions, conversations, messages, deals, erasures] = await Promise.all([
-    User.deleteMany({ role: { $ne: "admin" } }),
-    Listing.deleteMany({}),
-    Transaction.deleteMany({}),
-    Conversation.deleteMany({}),
-    Message.deleteMany({}),
-    Deal.deleteMany({}),
-    Erasure.deleteMany({}),
-  ]);
+  const [users, listings, transactions, conversations, messages, deals, erasures, files, notifications, tokens] =
+    await Promise.all([
+      User.deleteMany({ role: { $ne: "admin" } }),
+      Listing.deleteMany({}),
+      Transaction.deleteMany({}),
+      Conversation.deleteMany({}),
+      Message.deleteMany({}),
+      Deal.deleteMany({}),
+      Erasure.deleteMany({}),
+      File.deleteMany({}),
+      Notification.deleteMany({}),
+      PushToken.deleteMany({}),
+    ]);
 
   return {
     users: users.deletedCount,
@@ -100,6 +124,9 @@ async function purgeAllParticipantData() {
     messages: messages.deletedCount,
     deals: deals.deletedCount,
     erasureLedger: erasures.deletedCount,
+    files: files.deletedCount,
+    notifications: notifications.deletedCount,
+    pushTokens: tokens.deletedCount,
   };
 }
 

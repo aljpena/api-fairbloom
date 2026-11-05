@@ -4,6 +4,7 @@ const Deal = require("../models/Deal");
 const User = require("../models/User");
 const { getIO } = require("../utils/socket");
 const { checkDailyQuota, consumeQuota, createTransaction } = require("../utils/transactionService");
+const { notify } = require("../utils/notify");
 
 const emitDeal = (deal) => {
   const io = getIO();
@@ -60,6 +61,14 @@ const proposeDeal = async (req, res) => {
 
     await touchConversation(conversation._id, `Deal proposed: ${describe(deal)}`);
     emitDeal(deal);
+
+    notify(other._id, {
+      type: "deal_proposed",
+      title: "New deal proposal",
+      body: `${req.user.name} sent you a deal proposal`,
+      conversation: conversation._id,
+      deal: deal._id,
+    });
 
     res.status(201).json({ deal });
   } catch (err) {
@@ -151,6 +160,15 @@ async function acceptDeal(req, res, deal) {
   await touchConversation(deal.conversation, `Deal accepted: ${describe(deal)}`);
   emitDeal(claimed);
 
+  notify(deal.proposedBy, {
+    type: "deal_accepted",
+    title: "Deal accepted",
+    body: `${req.user.name} accepted your proposal`,
+    conversation: deal.conversation,
+    deal: deal._id,
+    transaction: result.transaction._id,
+  });
+
   res.json({ deal: claimed, transaction: result.transaction, priceCheck: result.priceCheck });
 }
 
@@ -196,6 +214,14 @@ const respondToDeal = async (req, res) => {
 
     await touchConversation(deal.conversation, `Deal ${newStatus}: ${describe(deal)}`);
     emitDeal(updated);
+
+    notify(action === "decline" ? deal.proposedBy : deal.respondent, {
+      type: `deal_${newStatus}`,
+      title: `Deal ${newStatus}`,
+      body: `${req.user.name} ${newStatus} the proposal`,
+      conversation: deal.conversation,
+      deal: deal._id,
+    });
 
     res.json({ deal: updated });
   } catch (err) {

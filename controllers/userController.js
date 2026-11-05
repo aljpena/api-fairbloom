@@ -3,6 +3,10 @@ const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const { disconnectUser } = require("../utils/socket");
 const { eraseUser } = require("../utils/eraseService");
+const mongoose = require("mongoose");
+const File = require("../models/File");
+const { processImage } = require("../utils/imageService");
+const { notifyAdmins } = require("../utils/notify");
 
 const publicUser = (user) => ({
   id: user._id,
@@ -114,4 +118,62 @@ const eraseMyAccount = async (req, res) => {
   }
 };
 
-module.exports = { updateProfile, changePassword, eraseMyAccount };
+/**
+ * @route   POST /api/users/me/verification-document   (multipart, field 'document')
+ * @desc    Upload a new Farmer ID / Business Permit photo, e.g. after a rejection.
+ *          Puts the account back in the review queue.
+ * @access  Private (farmer, buyer)
+ */
+const submitVerificationDocument = async (req, res) => {
+  if (!["farmer", "buyer"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Only farmer and buyer accounts are verified" });
+  }
+  if (!req.file) {
+    return res.status(400).json({ message: "Attach a photo in the 'document' field" });
+  }
+
+  try {
+    const user = await User.findById(req.user._id);
+    if (user.verificationStatus === "approved") {
+      return res.status(409).json({ message: "Your account is already verified" });
+    }
+
+    let processed;
+    try {
+      processed = await processImage(req.file.buffer, { maxSize: 2000, quality: 85 });
+    } catch (imgErr) {
+      return res.status(400).json({ message: imgErr.message });
+    }
+
+    const fileId = new mongoose.Types.ObjectId();
+    await File.create({ _id: fileId, owner: user._id, kind: "verification", ...processed });
+
+    const oldDocId = user.verificationDocument;
+    user.verificationDocument = fileId;
+    user.verificationStatus = "pending";
+    user.verificationNote = undefined;
+    user.verificationReviewedAt = undefined;
+    user.verificationReviewedBy = undefined;
+    try {
+      await user.save();
+    } catch (saveErr) {
+      await File.deleteOne({ _id: fileId });
+      throw saveErr;
+    }
+    if (oldDocId) await File.deleteOne({ _id: oldDocId });
+
+    notifyAdmins({
+      type: "verification_pending",
+      title: "Document resubmitted",
+      body: `${user.name} (${user.role}) uploaded a new document`,
+      subject: user._id,
+    });
+
+    res.json({ message: "Document received. An administrator will review it.", verificationStatus: "pending" });
+  } catch (err) {
+    console.error("[FairBloom] Submit verification document error:", err.message);
+    res.status(500).json({ message: "Server error uploading document" });
+  }
+};
+
+module.exports = { updateProfile, changePassword, eraseMyAccount, submitVerificationDocument };

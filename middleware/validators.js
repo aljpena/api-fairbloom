@@ -115,6 +115,25 @@ const adminEraseValidation = [
 
 const selfEraseValidation = [body("password").notEmpty().withMessage("Password is required")];
 
+const verificationDecisionValidation = [
+  body("decision").isIn(["approve", "reject"]).withMessage("decision must be 'approve' or 'reject'"),
+  body("reason")
+    .if(body("decision").equals("reject"))
+    .trim()
+    .notEmpty()
+    .withMessage("Please give a reason so the user can fix the problem")
+    .isLength({ max: 300 })
+    .withMessage("Reason is too long (max 300 characters)"),
+];
+
+const pushTokenValidation = [
+  body("token")
+    .trim()
+    .matches(/^(Exponent|Expo)PushToken\[.+\]$/)
+    .withMessage("Invalid Expo push token"),
+  body("platform").optional().isIn(["android", "ios"]).withMessage("platform must be 'android' or 'ios'"),
+];
+
 module.exports = {
   registerValidation,
   loginValidation,
@@ -128,4 +147,6 @@ module.exports = {
   userStatusValidation,
   adminEraseValidation,
   selfEraseValidation,
+  verificationDecisionValidation,
+  pushTokenValidation,
 };

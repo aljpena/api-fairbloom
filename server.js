@@ -58,6 +58,8 @@ app.use("/api/conversations", require("./routes/conversationRoutes"));
 app.use("/api/deals", require("./routes/dealRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/files", require("./routes/fileRoutes"));
+app.use("/api/notifications", require("./routes/notificationRoutes"));
 
 // ---- 404 handler ----
 app.use((req, res) => {
@@ -102,6 +104,7 @@ io.use(async (socket, next) => {
 
 io.on("connection", (socket) => {
   console.log(`[FairBloom] Socket connected: ${socket.id} (${socket.user.email})`);
+  socket.join(`user:${socket.user._id}`);
 
   // Authorization: only participants may join a conversation's room.
   // The optional `ack` callback tells the client whether joining worked.

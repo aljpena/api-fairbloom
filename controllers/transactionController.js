@@ -2,6 +2,7 @@ const { validationResult } = require("express-validator");
 const Transaction = require("../models/Transaction");
 const escapeRegex = require("../utils/escapeRegex");
 const { checkDailyQuota, consumeQuota, dailyLimit, createTransaction } = require("../utils/transactionService");
+const { notify } = require("../utils/notify");
 
 /**
  * Manual report of a sale made OUTSIDE the app (e.g. at a trading post).
@@ -191,6 +192,19 @@ const reviewTransaction = async (req, res) => {
     transaction.status = decision === "approve" ? "approved" : "rejected";
     transaction.reviewedBy = req.user._id;
     await transaction.save();
+
+    const parties = [
+      ...new Set([transaction.submittedBy, transaction.farmer, transaction.buyer].filter(Boolean).map(String)),
+    ];
+    const ok = transaction.status === "approved";
+    notify(parties, {
+      type: `transaction_${transaction.status}`,
+      title: ok ? "Transaction approved" : "Transaction rejected",
+      body: ok
+        ? `Your ${transaction.flowerVariety} sale was approved and now counts toward the price index.`
+        : `Your ${transaction.flowerVariety} sale was rejected by an administrator.`,
+      transaction: transaction._id,
+    });
 
     res.json({ transaction });
   } catch (err) {

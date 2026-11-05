@@ -20,6 +20,7 @@ const run = async () => {
       password: ADMIN_PASSWORD,
       role: "admin",
       isEmailVerified: true,
+      verificationStatus: "approved",
     });
     console.log(`[FairBloom] Admin account created: ${ADMIN_EMAIL}`);
     console.log(`[FairBloom] Default password: ${ADMIN_PASSWORD} (change this after first login)`);

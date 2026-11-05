@@ -10,14 +10,12 @@ const {
 } = require("../controllers/transactionController");
 const { transactionValidation } = require("../middleware/validators");
 const { protect, authorize } = require("../middleware/auth");
+const requireApproved = require("../middleware/requireApproved");
 
-router.post("/", protect, authorize("farmer", "buyer"), transactionValidation, submitTransaction);
+router.post("/", protect, authorize("farmer", "buyer"), requireApproved, transactionValidation, submitTransaction);
 
-// Fixed-path routes first
 router.get("/mine", protect, authorize("farmer", "buyer"), getMyTransactions);
 router.get("/pending", protect, authorize("admin"), getPendingTransactions);
-
-// Admin-only
 router.get("/", protect, authorize("admin"), getTransactions);
 
 router.patch("/:id/review", protect, authorize("admin"), reviewTransaction);

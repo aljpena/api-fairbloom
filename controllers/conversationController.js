@@ -1,25 +1,39 @@
+const mongoose = require("mongoose");
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
-const { getIO } = require("../utils/socket");
+const User = require("../models/User");
+const File = require("../models/File");
+const Notification = require("../models/Notification");
+const { getIO, isUserInRoom } = require("../utils/socket");
+const { processImage } = require("../utils/imageService");
+const { notify } = require("../utils/notify");
 
 /**
  * @route   POST /api/conversations
- * @desc    Start a new conversation with another user, or return the
- *          existing one if these two users already have one going.
- *          Body: { recipientId, listingId? }
- * @access  Private
+ * @desc    Body: { recipientId, listingId? }
+ * @access  Private (approved users)
  */
 const startConversation = async (req, res) => {
   const { recipientId, listingId } = req.body;
 
-  if (!recipientId) {
-    return res.status(400).json({ message: "recipientId is required" });
+  if (!recipientId || !mongoose.isValidObjectId(recipientId)) {
+    return res.status(400).json({ message: "A valid recipientId is required" });
   }
   if (recipientId === String(req.user._id)) {
     return res.status(400).json({ message: "You can't start a conversation with yourself" });
   }
 
   try {
+    const recipient = await User.findById(recipientId);
+    if (
+      !recipient ||
+      !recipient.isActive ||
+      !["farmer", "buyer"].includes(recipient.role) ||
+      recipient.verificationStatus !== "approved"
+    ) {
+      return res.status(404).json({ message: "That user isn't available to chat" });
+    }
+
     let conversation = await Conversation.findOne({
       participants: { $all: [req.user._id, recipientId], $size: 2 },
     });
@@ -42,8 +56,6 @@ const startConversation = async (req, res) => {
 
 /**
  * @route   GET /api/conversations
- * @desc    List all conversations the current user is part of,
- *          most recently active first.
  * @access  Private
  */
 const getConversations = async (req, res) => {
@@ -83,6 +95,15 @@ const getMessages = async (req, res) => {
       .populate("sender", "name role")
       .sort({ createdAt: 1 });
 
+    // Opening the chat clears its notifications.
+    Notification.updateMany(
+      { user: req.user._id, conversation: conversation._id, isRead: false },
+      { isRead: true, readAt: new Date() },
+      { timestamps: false }
+    )
+      .exec()
+      .catch(() => {});
+
     res.json({ messages });
   } catch (err) {
     if (err.name === "CastError") {
@@ -95,14 +116,18 @@ const getMessages = async (req, res) => {
 
 /**
  * @route   POST /api/conversations/:id/messages
- * @desc    Body: { content }
- * @access  Private (participants only)
+ * @desc    JSON { content } for text, or multipart/form-data with an optional
+ *          `content` caption and an `image` file. At least one is required.
+ * @access  Private (approved participants only)
  */
 const sendMessage = async (req, res) => {
-  const { content } = req.body;
+  const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
 
-  if (!content || !content.trim()) {
-    return res.status(400).json({ message: "Message content is required" });
+  if (!content && !req.file) {
+    return res.status(400).json({ message: "Message content or an image is required" });
+  }
+  if (content.length > 1000) {
+    return res.status(400).json({ message: "Message is too long (max 1000 characters)" });
   }
 
   try {
@@ -112,20 +137,53 @@ const sendMessage = async (req, res) => {
     );
     if (error) return res.status(error).json({ message: guardMessage });
 
-    const newMessage = await Message.create({
-      conversation: conversation._id,
-      sender: req.user._id,
-      content: content.trim(),
-    });
+    let fileDoc = null;
+    if (req.file) {
+      let processed;
+      try {
+        processed = await processImage(req.file.buffer, { maxSize: 1280, quality: 75 });
+      } catch (imgErr) {
+        return res.status(400).json({ message: imgErr.message });
+      }
+      fileDoc = await File.create({
+        owner: req.user._id,
+        kind: "chat",
+        conversation: conversation._id,
+        ...processed,
+      });
+    }
+
+    let newMessage;
+    try {
+      newMessage = await Message.create({
+        conversation: conversation._id,
+        sender: req.user._id,
+        content,
+        image: fileDoc ? fileDoc._id : null,
+      });
+    } catch (msgErr) {
+      if (fileDoc) await File.deleteOne({ _id: fileDoc._id });
+      throw msgErr;
+    }
     await newMessage.populate("sender", "name role");
 
-    conversation.lastMessage = content.trim();
+    conversation.lastMessage = content || "[Photo]";
     conversation.lastMessageAt = new Date();
     await conversation.save();
 
     const io = getIO();
-    if (io) {
-      io.to(conversation._id.toString()).emit("receive_message", newMessage);
+    if (io) io.to(conversation._id.toString()).emit("receive_message", newMessage);
+
+    // Notify the other person, unless they're looking at this chat right now.
+    const recipientId = conversation.participants.find((p) => String(p) !== String(req.user._id));
+    if (recipientId && !isUserInRoom(recipientId, String(conversation._id))) {
+      notify(recipientId, {
+        type: "message",
+        title: req.user.name,
+        body: content ? "Sent you a message" : "Sent you a photo", // generic on purpose: push passes through Expo/Google
+        conversation: conversation._id,
+        collapse: true,
+      });
     }
 
     res.status(201).json({ message: newMessage });

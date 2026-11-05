@@ -7,6 +7,8 @@ const escapeRegex = require("../utils/escapeRegex");
 const { disconnectUser } = require("../utils/socket");
 const { createBackup, serialize, stamp } = require("../utils/backupService");
 const { eraseUser } = require("../utils/eraseService");
+const File = require("../models/File");
+const { notify } = require("../utils/notify");
 
 /**
  * @route   GET /api/admin/users
@@ -206,5 +208,108 @@ const eraseUserByAdmin = async (req, res) => {
     res.status(500).json({ message: "Server error erasing participant" });
   }
 };
+/**
+ * @route   GET /api/admin/verifications
+ * @desc    The review queue. Query: status (pending|approved|rejected, default pending), page, limit.
+ *          Oldest first. `documentUrl` can be fetched with the admin's token.
+ * @access  Private (admin only)
+ */
+const listVerifications = async (req, res) => {
+  try {
+    const status = ["pending", "approved", "rejected"].includes(req.query.status) ? req.query.status : "pending";
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
 
-module.exports = { listUsers, getUser, setUserStatus, downloadBackup, eraseUserByAdmin };
+    const filter = { role: { $in: ["farmer", "buyer"] }, isEmailVerified: true, verificationStatus: status };
+
+    const [rows, total] = await Promise.all([
+      User.find(filter)
+        .sort({ createdAt: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select(
+          "name email phone role farmLocation buyerCategory businessLocation verificationStatus verificationDocument verificationNote verificationReviewedAt createdAt"
+        )
+        .lean(),
+      User.countDocuments(filter),
+    ]);
+
+    const users = rows.map((u) => ({
+      ...u,
+      documentUrl: u.verificationDocument ? `/api/files/${u.verificationDocument}` : null,
+    }));
+
+    res.json({ users, pagination: { total, page, pages: Math.ceil(total / limit) } });
+  } catch (err) {
+    console.error("[FairBloom] List verifications error:", err.message);
+    res.status(500).json({ message: "Server error fetching verification queue" });
+  }
+};
+
+/**
+ * @route   PATCH /api/admin/users/:id/verification
+ * @desc    Body: { decision: "approve" | "reject", reason? }  (reason required to reject)
+ *          Unless KEEP_VERIFICATION_DOCS=true, the document image is deleted once decided.
+ * @access  Private (admin only)
+ */
+const reviewVerification = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { decision, reason } = req.body;
+
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!["farmer", "buyer"].includes(user.role)) {
+      return res.status(400).json({ message: "Only farmer and buyer accounts are verified" });
+    }
+    if (!user.isEmailVerified) {
+      return res.status(400).json({ message: "This user hasn't verified their email yet" });
+    }
+
+    const approved = decision === "approve";
+    if (approved && !user.verificationDocument) {
+      return res.status(400).json({ message: "No document on file. Ask the user to upload one first." });
+    }
+
+    user.verificationStatus = approved ? "approved" : "rejected";
+    user.verificationNote = approved ? undefined : reason;
+    user.verificationReviewedAt = new Date();
+    user.verificationReviewedBy = req.user._id;
+
+    let documentDeleted = false;
+    if (process.env.KEEP_VERIFICATION_DOCS !== "true" && user.verificationDocument) {
+      await File.deleteOne({ _id: user.verificationDocument });
+      user.verificationDocument = null;
+      documentDeleted = true;
+    }
+    await user.save();
+
+    notify(user._id, {
+      type: approved ? "verification_approved" : "verification_rejected",
+      title: approved ? "Account verified" : "Verification rejected",
+      body: approved
+        ? "Your account is approved. You can now post listings and start chatting."
+        : `Please upload a new document. Reason: ${reason}`,
+      subject: user._id,
+    });
+
+    res.json({ user, documentDeleted });
+  } catch (err) {
+    if (err.name === "CastError") return res.status(400).json({ message: "Invalid user id" });
+    console.error("[FairBloom] Review verification error:", err.message);
+    res.status(500).json({ message: "Server error reviewing verification" });
+  }
+};
+
+module.exports = {
+  listUsers,
+  getUser,
+  setUserStatus,
+  downloadBackup,
+  eraseUserByAdmin,
+  listVerifications,
+  reviewVerification,
+};

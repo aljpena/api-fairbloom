@@ -9,6 +9,7 @@ const deviationThreshold = () => Number(process.env.PRICE_DEVIATION_THRESHOLD_PE
 // in Manila even if the server runs in UTC.
 const dayKey = (date) => date.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 const isNewDay = (lastDate) => !lastDate || dayKey(lastDate) !== dayKey(new Date());
+const { notify, notifyAdmins } = require("./notify");
 
 /** Layer 2. True if the user may still submit today. Resets the counter on a new day (caller saves). */
 function checkDailyQuota(user) {
@@ -67,6 +68,23 @@ async function createTransaction({
     flaggedForReview,
     status,
   });
+  
+    if (flaggedForReview) {
+    notifyAdmins({
+      type: "transaction_flagged",
+      title: "Transaction needs review",
+      body: `${flowerVariety} at ₱${price} is ${deviationPercent}% away from the current index`,
+      transaction: transaction._id,
+    });
+
+    const parties = [...new Set([farmer, buyer, submittedBy].filter(Boolean).map(String))];
+    notify(parties, {
+      type: "transaction_held",
+      title: "Price under review",
+      body: `Your ${flowerVariety} sale was held for admin review because the price is far from the current index.`,
+      transaction: transaction._id,
+    });
+  }
 
   return {
     transaction,

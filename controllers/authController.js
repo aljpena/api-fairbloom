@@ -1,8 +1,12 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
+const File = require("../models/File");
 const generateToken = require("../utils/generateToken");
 const { sendOtpEmail } = require("../utils/sendEmail");
+const { processImage } = require("../utils/imageService");
+const { notifyAdmins } = require("../utils/notify");
 
 const OTP_EXPIRY_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES) || 10;
 const OTP_MAX_ATTEMPTS = 5;
@@ -10,10 +14,8 @@ const OTP_RESEND_COOLDOWN_SECONDS = 60;
 
 // ---------- OTP helpers ----------
 
-// randomInt is cryptographically secure (Math.random is not).
 const generateOtp = () => String(crypto.randomInt(100000, 1000000));
 
-// Only a keyed hash is stored, so a database leak doesn't expose live codes.
 const hashOtp = (otp) =>
   crypto.createHmac("sha256", process.env.JWT_SECRET).update(otp).digest("hex");
 
@@ -23,7 +25,6 @@ const safeEqual = (a, b) => {
   return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
 };
 
-// Sets fresh OTP fields on the user doc (caller must save) and returns the plain code.
 function issueOtp(user) {
   const otp = generateOtp();
   user.otpHash = hashOtp(otp);
@@ -47,13 +48,15 @@ const publicUser = (user) => ({
   farmLocation: user.farmLocation,
   buyerCategory: user.buyerCategory,
   businessLocation: user.businessLocation,
+  verificationStatus: user.role === "admin" ? "approved" : user.verificationStatus,
 });
 
 // ---------- Controllers ----------
 
 /**
- * @route   POST /api/auth/register
- * @desc    Create an UNVERIFIED account and email a 6-digit code. No token yet.
+ * @route   POST /api/auth/register   (multipart/form-data)
+ * @desc    Fields as before, plus a `document` image: Farmer ID (farmers) or
+ *          Business Permit (buyers). Creates an UNVERIFIED account and emails a code.
  * @access  Public
  */
 const register = async (req, res) => {
@@ -64,18 +67,18 @@ const register = async (req, res) => {
 
   const { name, email, phone, password, role, farmLocation, buyerCategory, businessLocation } = req.body;
 
+  if (!req.file) {
+    const what = role === "farmer" ? "Farmer ID" : "Business Permit";
+    return res.status(400).json({ message: `Please attach a photo of your ${what} (form field 'document')` });
+  }
+
   try {
     const existing = await User.findOne({ email }).select("+otpLastSentAt");
 
-    // Verified accounts (and admins, always) can't be re-registered.
     if (existing && (existing.isEmailVerified || existing.role === "admin")) {
       return res.status(409).json({ message: "An account with this email already exists" });
     }
 
-    // An unverified account for this email can be re-registered (e.g. the user
-    // mistyped their password or lost the code). Safe because only the owner of
-    // the inbox can ever complete verification. The cooldown stops it being
-    // used to spam someone else's inbox.
     if (existing) {
       const wait = secondsUntilResend(existing);
       if (wait > 0) {
@@ -84,6 +87,14 @@ const register = async (req, res) => {
           retryAfterSeconds: wait,
         });
       }
+    }
+
+    // Validate and shrink the image BEFORE creating anything.
+    let processed;
+    try {
+      processed = await processImage(req.file.buffer, { maxSize: 2000, quality: 85 });
+    } catch (imgErr) {
+      return res.status(400).json({ message: imgErr.message });
     }
 
     const user = existing || new User();
@@ -96,20 +107,41 @@ const register = async (req, res) => {
     user.buyerCategory = role === "buyer" ? buyerCategory : null;
     user.businessLocation = role === "buyer" ? businessLocation : null;
 
+    const oldDocId = user.verificationDocument;
+    const fileId = new mongoose.Types.ObjectId();
+    user.verificationStatus = "pending";
+    user.verificationDocument = fileId;
+    user.verificationNote = undefined;
+    user.verificationReviewedAt = undefined;
+    user.verificationReviewedBy = undefined;
+
     const otp = issueOtp(user);
-    await user.save();
+
+    await File.create({ _id: fileId, owner: user._id, kind: "verification", ...processed });
+    try {
+      await user.save();
+    } catch (saveErr) {
+      await File.deleteOne({ _id: fileId }); // don't leave an orphaned document behind
+      throw saveErr;
+    }
+    if (oldDocId) await File.deleteOne({ _id: oldDocId }); // re-registration replaces the old upload
+
+    try {
+      await sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES);
+    } catch (mailErr) {
+      console.error("[FairBloom] Send OTP email failed:", mailErr.message);
+      return res.status(502).json({
+        message: "Account created, but we couldn't send the verification email. Please tap 'Resend code'.",
+        email: user.email,
+      });
+    }
 
     res.status(201).json({
-      message: "Account created. Enter the 6-digit code we emailed you to verify.",
+      message:
+        "Account created. Enter the 6-digit code we emailed you. An administrator will then review your document.",
       email: user.email,
       expiresInMinutes: OTP_EXPIRY_MINUTES,
     });
-
-    // Send AFTER responding: the SMTP round-trip (1-5s) must not keep the user waiting on the
-    // sign-up screen. If it fails, the app's "Resend code" button recovers.
-    sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES).catch((mailErr) =>
-      console.error("[FairBloom] Send OTP email failed:", mailErr.message),
-    );
   } catch (err) {
     console.error("[FairBloom] Register error:", err.message);
     res.status(500).json({ message: "Server error during registration" });
@@ -118,8 +150,6 @@ const register = async (req, res) => {
 
 /**
  * @route   POST /api/auth/verify-email
- * @desc    Body: { email, otp }. On success marks the account verified and
- *          returns a token, so the user is logged in right away.
  * @access  Public
  */
 const verifyEmail = async (req, res) => {
@@ -155,13 +185,22 @@ const verifyEmail = async (req, res) => {
       });
     }
 
-    // Correct: verify the account and burn the code so it can't be reused.
     user.isEmailVerified = true;
     user.otpHash = undefined;
     user.otpExpiresAt = undefined;
     user.otpAttempts = 0;
     user.otpLastSentAt = undefined;
     await user.save();
+
+    // The email is confirmed, so the document is now ready for an admin to review.
+    if (user.role !== "admin") {
+      notifyAdmins({
+        type: "verification_pending",
+        title: "New account to verify",
+        body: `${user.name} (${user.role}) is waiting for document review`,
+        subject: user._id,
+      });
+    }
 
     res.json({ token: generateToken(user), user: publicUser(user) });
   } catch (err) {
@@ -172,9 +211,6 @@ const verifyEmail = async (req, res) => {
 
 /**
  * @route   POST /api/auth/resend-otp
- * @desc    Body: { email }. Sends a fresh code (60s cooldown). The response
- *          is the same whether or not the email exists, so this endpoint
- *          can't be used to discover registered emails.
  * @access  Public
  */
 const resendOtp = async (req, res) => {
@@ -204,11 +240,14 @@ const resendOtp = async (req, res) => {
     const otp = issueOtp(user);
     await user.save();
 
-    res.json(genericReply);
+    try {
+      await sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES);
+    } catch (mailErr) {
+      console.error("[FairBloom] Resend OTP email failed:", mailErr.message);
+      return res.status(502).json({ message: "We couldn't send the email. Please try again shortly." });
+    }
 
-    sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES).catch((mailErr) =>
-      console.error("[FairBloom] Resend OTP email failed:", mailErr.message),
-    );
+    res.json(genericReply);
   } catch (err) {
     console.error("[FairBloom] Resend OTP error:", err.message);
     res.status(500).json({ message: "Server error resending code" });
@@ -217,7 +256,6 @@ const resendOtp = async (req, res) => {
 
 /**
  * @route   POST /api/auth/login
- * @desc    Authenticate a verified user and return a JWT
  * @access  Public
  */
 const login = async (req, res) => {
@@ -239,8 +277,6 @@ const login = async (req, res) => {
       return res.status(403).json({ message: "This account has been deactivated" });
     }
 
-    // Checked AFTER the password, so someone without the password can't probe
-    // which emails are pending. Admins are exempt (provisioned by the seed script).
     if (!user.isEmailVerified && user.role !== "admin") {
       return res.status(403).json({
         code: "EMAIL_NOT_VERIFIED",
@@ -249,6 +285,7 @@ const login = async (req, res) => {
       });
     }
 
+    // Users awaiting document approval CAN log in (to see their status and upload a new document).
     res.json({ token: generateToken(user), user: publicUser(user) });
   } catch (err) {
     console.error("[FairBloom] Login error:", err.message);
