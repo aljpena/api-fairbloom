@@ -14,7 +14,20 @@ const listingSchema = new mongoose.Schema(
 
     flowerVariety: { type: String, required: true, trim: true },
     quantity: { type: Number, required: true, min: 1 }, // in dozens
-    pricePerUnit: { type: Number, min: 0, default: null }, // optional asking price
+    pricePerUnit: {
+      type: Number,
+      min: 0,
+      default: null,
+      required: function () {
+        return this.type === "sell" && this.status === "active";
+      },
+      validate: {
+        validator: function (value) {
+          return this.type !== "sell" || this.status !== "active" || value >= 0.01;
+        },
+        message: "Asking price per dozen must be greater than 0",
+      },
+    },
 
     location: {
       type: String,

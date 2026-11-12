@@ -23,11 +23,21 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
+const corsOriginValidator = (origin, callback) => {
+  if (!origin) return callback(null, true);
+
+  if (!allowedOrigins.length || allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+
+  return callback(new Error("Origin not allowed by CORS"));
+};
+
 // ---- Core middleware ----
 app.use(helmet());
 app.use(
   cors({
-    origin: allowedOrigins.length ? allowedOrigins : "*",
+    origin: corsOriginValidator,
     credentials: true,
   })
 );
@@ -77,7 +87,8 @@ app.use((err, req, res, next) => {
 // ---- Socket.IO (real-time delivery of messages) ----
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins.length ? allowedOrigins : "*",
+    origin: corsOriginValidator,
+    credentials: true,
   },
 });
 setIO(io);

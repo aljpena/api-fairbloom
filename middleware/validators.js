@@ -50,6 +50,11 @@ const listingValidation = [
   varietyField(),
   body("quantity").isFloat({ min: 1 }).withMessage("Quantity must be at least 1"),
   body("pricePerUnit")
+    .if(body("type").equals("sell"))
+    .isFloat({ min: 0.01 })
+    .withMessage("Asking price per dozen is required and must be greater than 0"),
+  body("pricePerUnit")
+    .if(body("type").equals("request"))
     .optional({ nullable: true })
     .isFloat({ min: 0 })
     .withMessage("Price per unit must be a positive number"),

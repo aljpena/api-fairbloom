@@ -10,7 +10,7 @@ const Conversation = require("../models/Conversation");
  */
 const getFile = async (req, res) => {
   try {
-    const file = await File.findById(req.params.id).select("+data");
+    const file = await File.findById(req.params.id).select("+data").lean();
     if (!file) return res.status(404).json({ message: "File not found" });
 
     const me = String(req.user._id);
@@ -25,14 +25,20 @@ const getFile = async (req, res) => {
 
     if (!allowed) return res.status(404).json({ message: "File not found" });
 
+    const data = Buffer.isBuffer(file.data) ? file.data : file.data?.value?.(true);
+    if (!Buffer.isBuffer(data)) {
+      console.error("[FairBloom] Get file error: Stored file data is not a buffer");
+      return res.status(500).json({ message: "Server error fetching file" });
+    }
+
     res.set({
       "Content-Type": file.contentType,
-      "Content-Length": file.size,
+      "Content-Length": data.length,
       "Content-Disposition": "inline",
       // ID photos are never cached; chat images never change, so they can be.
       "Cache-Control": file.kind === "verification" ? "no-store" : "private, max-age=86400",
     });
-    res.send(Buffer.from(file.data));
+    res.send(data);
   } catch (err) {
     if (err.name === "CastError") return res.status(404).json({ message: "File not found" });
     console.error("[FairBloom] Get file error:", err.message);
