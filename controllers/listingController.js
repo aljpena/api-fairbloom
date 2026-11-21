@@ -1,6 +1,9 @@
+const mongoose = require("mongoose");
 const { validationResult } = require("express-validator");
 const Listing = require("../models/Listing");
+const File = require("../models/File");
 const escapeRegex = require("../utils/escapeRegex");
+const { processImage } = require("../utils/imageService");
 const { getVwapMap } = require("../utils/priceIndex");
 const { DEFAULT_WINDOW_DAYS } = require("../utils/vwap");
 
@@ -13,6 +16,17 @@ const SORTS = {
   quantity_asc: { quantity: 1, createdAt: -1 },
   quantity_desc: { quantity: -1, createdAt: -1 },
 };
+
+const imageUrlFor = (image) => (image ? `/api/files/listing/${image}` : null);
+
+// Works for both mongoose documents and lean objects.
+const shape = (listing) => {
+  const o = typeof listing.toObject === "function" ? listing.toObject() : listing;
+  return { ...o, imageUrl: imageUrlFor(o.image) };
+};
+
+// Form fields arrive as strings; an empty price means "no asking price".
+const parsePrice = (v) => (v === undefined || v === null || v === "" ? null : Number(v));
 
 /** Adds the current index price (and how the asking price compares) to plain listing objects. */
 async function attachMarketPrice(listings) {
@@ -29,6 +43,7 @@ async function attachMarketPrice(listings) {
 
     return {
       ...l,
+      imageUrl: imageUrlFor(l.image),
       marketPrice: row
         ? { vwap, windowDays: DEFAULT_WINDOW_DAYS, transactionCount: row.transactionCount }
         : null,
@@ -38,8 +53,8 @@ async function attachMarketPrice(listings) {
 }
 
 /**
- * @route   POST /api/listings
- * @access  Private (farmer, buyer)
+ * @route   POST /api/listings   (JSON, or multipart/form-data with an optional `image`)
+ * @access  Private (approved farmer, buyer). Only farmers may attach a photo.
  */
 const createListing = async (req, res) => {
   const errors = validationResult(req);
@@ -53,20 +68,42 @@ const createListing = async (req, res) => {
       message: `As a ${req.user.role}, you can only create '${expectedType}' listings`,
     });
   }
+  if (req.file && req.user.role !== "farmer") {
+    return res.status(403).json({ message: "Only farmers can attach a photo to a listing" });
+  }
 
+  // Validate and shrink the image BEFORE creating anything.
+  let processed = null;
+  if (req.file) {
+    try {
+      processed = await processImage(req.file.buffer, { maxSize: 1280, quality: 78 });
+    } catch (imgErr) {
+      return res.status(400).json({ message: imgErr.message });
+    }
+  }
+
+  let fileId = null;
   try {
+    if (processed) {
+      fileId = new mongoose.Types.ObjectId();
+      await File.create({ _id: fileId, owner: req.user._id, kind: "listing", ...processed });
+    }
+
     const listing = await Listing.create({
       postedBy: req.user._id,
       type,
       flowerVariety,
       quantity,
-      pricePerUnit: pricePerUnit ?? null,
+      pricePerUnit: parsePrice(pricePerUnit),
       location,
       description,
+      image: fileId,
     });
 
-    res.status(201).json({ listing });
+    res.status(201).json({ listing: shape(listing) });
   } catch (err) {
+    if (fileId) await File.deleteOne({ _id: fileId }).catch(() => {}); // don't leave an orphaned photo
+    if (err.name === "ValidationError") return res.status(400).json({ message: err.message });
     console.error("[FairBloom] Create listing error:", err.message);
     res.status(500).json({ message: "Server error creating listing" });
   }
@@ -75,8 +112,6 @@ const createListing = async (req, res) => {
 /**
  * @route   GET /api/listings
  * @desc    Query: type, flowerVariety, location, status, sort, page, limit
- *          sort = newest | oldest | price_asc | price_desc | quantity_asc | quantity_desc
- *          (price sorts only include listings that state an asking price)
  * @access  Public
  */
 const getListings = async (req, res) => {
@@ -85,7 +120,6 @@ const getListings = async (req, res) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
 
-    // String() blocks query-object tricks like ?type[$ne]=sell
     const filter = {};
     if (type) filter.type = String(type);
     if (location) filter.location = String(location);
@@ -138,10 +172,13 @@ const getListingById = async (req, res) => {
 };
 
 /**
- * @route   PATCH /api/listings/:id
+ * @route   PATCH /api/listings/:id   (JSON, or multipart/form-data)
+ * @desc    Editable: quantity, pricePerUnit, description, status.
+ *          Photo: send a new `image` to replace it, or `removeImage=true` to remove it.
  * @access  Private (owner only)
  */
 const updateListing = async (req, res) => {
+  let newFileId = null;
   try {
     const listing = await Listing.findById(req.params.id);
     if (!listing) return res.status(404).json({ message: "Listing not found" });
@@ -149,14 +186,41 @@ const updateListing = async (req, res) => {
     if (listing.postedBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "You can only edit your own listings" });
     }
+    if (req.file && req.user.role !== "farmer") {
+      return res.status(403).json({ message: "Only farmers can attach a photo to a listing" });
+    }
 
     ["quantity", "pricePerUnit", "description", "status"].forEach((field) => {
-      if (req.body[field] !== undefined) listing[field] = req.body[field];
+      if (req.body[field] === undefined) return;
+      listing[field] = field === "pricePerUnit" ? parsePrice(req.body[field]) : req.body[field];
     });
 
+    const oldImage = listing.image;
+
+    if (req.file) {
+      let processed;
+      try {
+        processed = await processImage(req.file.buffer, { maxSize: 1280, quality: 78 });
+      } catch (imgErr) {
+        return res.status(400).json({ message: imgErr.message });
+      }
+      newFileId = new mongoose.Types.ObjectId();
+      await File.create({ _id: newFileId, owner: req.user._id, kind: "listing", ...processed });
+      listing.image = newFileId;
+    } else if (req.body.removeImage === true || req.body.removeImage === "true") {
+      listing.image = null;
+    }
+
     await listing.save();
-    res.json({ listing });
+
+    // Only delete the previous photo after the new state is safely saved.
+    if (oldImage && String(oldImage) !== String(listing.image)) {
+      await File.deleteOne({ _id: oldImage }).catch(() => {});
+    }
+
+    res.json({ listing: shape(listing) });
   } catch (err) {
+    if (newFileId) await File.deleteOne({ _id: newFileId }).catch(() => {});
     if (err.name === "ValidationError") return res.status(400).json({ message: err.message });
     if (err.name === "CastError") return res.status(400).json({ message: "Invalid listing id" });
     console.error("[FairBloom] Update listing error:", err.message);
@@ -177,7 +241,10 @@ const deleteListing = async (req, res) => {
       return res.status(403).json({ message: "You can only delete your own listings" });
     }
 
+    const imageId = listing.image;
     await listing.deleteOne();
+    if (imageId) await File.deleteOne({ _id: imageId }).catch(() => {});
+
     res.json({ message: "Listing deleted" });
   } catch (err) {
     if (err.name === "CastError") return res.status(400).json({ message: "Invalid listing id" });

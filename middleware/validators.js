@@ -58,6 +58,10 @@ const listingValidation = [
     .optional({ nullable: true })
     .isFloat({ min: 0 })
     .withMessage("Price per unit must be a positive number"),
+  body("pricePerUnit")
+    .optional({ values: "falsy" })
+    .isFloat({ min: 0 })
+    .withMessage("Price per unit must be a positive number"),
   body("location").isIn(LOCATIONS).withMessage("A valid location is required"),
   body("description").optional().isLength({ max: 500 }).withMessage("Description too long (max 500 chars)"),
 ];

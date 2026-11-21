@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const router = express.Router();
 
 const {
@@ -11,12 +12,42 @@ const {
 const { listingValidation } = require("../middleware/validators");
 const { protect, authorize } = require("../middleware/auth");
 const requireApproved = require("../middleware/requireApproved");
+const { uploadImage } = require("../middleware/upload");
+
+// Per-user cap on photo uploads, so nobody can fill the database.
+const imageLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => String(req.user._id),
+  skip: (req) => !req.is("multipart/form-data"),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "You're uploading photos too quickly. Please wait a few minutes." },
+});
 
 router.get("/", getListings);
 router.get("/:id", getListingById);
 
-router.post("/", protect, authorize("farmer", "buyer"), requireApproved, listingValidation, createListing);
-router.patch("/:id", protect, authorize("farmer", "buyer"), requireApproved, updateListing);
+// uploadImage runs BEFORE the validators so multipart form fields are parsed first.
+router.post(
+  "/",
+  protect,
+  authorize("farmer", "buyer"),
+  requireApproved,
+  imageLimiter,
+  uploadImage("image"),
+  listingValidation,
+  createListing
+);
+router.patch(
+  "/:id",
+  protect,
+  authorize("farmer", "buyer"),
+  requireApproved,
+  imageLimiter,
+  uploadImage("image"),
+  updateListing
+);
 router.delete("/:id", protect, authorize("farmer", "buyer"), requireApproved, deleteListing);
 
 module.exports = router;

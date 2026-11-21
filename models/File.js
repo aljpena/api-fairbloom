@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const fileSchema = new mongoose.Schema(
   {
     owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    kind: { type: String, enum: ["chat", "verification"], required: true },
+    kind: { type: String, enum: ["chat", "verification", "listing"], required: true },
     conversation: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation", default: null, index: true },
     contentType: { type: String, default: "image/jpeg" },
     size: { type: Number, required: true },

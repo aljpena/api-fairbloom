@@ -2,19 +2,16 @@ const express = require("express");
 const router = express.Router();
 
 const {
-  submitTransaction,
   getTransactions,
   getMyTransactions,
   getPendingTransactions,
   reviewTransaction,
 } = require("../controllers/transactionController");
-const { transactionValidation } = require("../middleware/validators");
 const { protect, authorize } = require("../middleware/auth");
-const requireApproved = require("../middleware/requireApproved");
 
-router.post("/", protect, authorize("farmer", "buyer"), requireApproved, transactionValidation, submitTransaction);
+// There is no POST here anymore: transactions are created only by accepted deals.
 
-router.get("/mine", protect, authorize("farmer", "buyer"), requireApproved, getMyTransactions);
+router.get("/mine", protect, authorize("farmer", "buyer"), getMyTransactions);
 router.get("/pending", protect, authorize("admin"), getPendingTransactions);
 router.get("/", protect, authorize("admin"), getTransactions);
 

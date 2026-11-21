@@ -36,6 +36,7 @@ const listingSchema = new mongoose.Schema(
     },
 
     description: { type: String, trim: true, maxlength: 500 },
+    image: { type: mongoose.Schema.Types.ObjectId, ref: "File", default: null }, // optional flower photo
 
     status: {
       type: String,

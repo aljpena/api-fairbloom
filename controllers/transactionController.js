@@ -1,71 +1,6 @@
-const { validationResult } = require("express-validator");
 const Transaction = require("../models/Transaction");
 const escapeRegex = require("../utils/escapeRegex");
-const { checkDailyQuota, consumeQuota, dailyLimit, createTransaction } = require("../utils/transactionService");
 const { notify } = require("../utils/notify");
-
-/**
- * Manual report of a sale made OUTSIDE the app (e.g. at a trading post).
- * Sales negotiated in the app should be confirmed through a deal instead.
- *
- * @route   POST /api/transactions
- * @access  Private (farmer, buyer)
- */
-const submitTransaction = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-  const { flowerVariety, price, volume, location } = req.body;
-
-  try {
-    const user = req.user;
-
-    // Layer 2: daily cap
-    if (!checkDailyQuota(user)) {
-      return res.status(429).json({
-        message: `Daily submission limit reached (${dailyLimit()} per day). Please try again tomorrow.`,
-      });
-    }
-
-    // Duplicate guard: the same sale was already confirmed in chat.
-    const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    const duplicate = await Transaction.findOne({
-      source: "deal",
-      $or: [{ farmer: user._id }, { buyer: user._id }],
-      flowerVariety: new RegExp(`^${escapeRegex(flowerVariety)}$`, "i"),
-      price,
-      volume,
-      createdAt: { $gte: since },
-    });
-    if (duplicate) {
-      return res.status(409).json({
-        message: "This looks like a sale you already confirmed in chat, so it's already recorded.",
-      });
-    }
-
-    // Layer 3 + save
-    const { transaction, priceCheck } = await createTransaction({
-      flowerVariety,
-      price,
-      volume,
-      location,
-      submittedBy: user._id,
-      source: "manual",
-    });
-
-    consumeQuota(user);
-    await user.save();
-
-    res.status(201).json({
-      transaction,
-      priceCheck,
-      submissionsRemainingToday: dailyLimit() - user.submissionCount,
-    });
-  } catch (err) {
-    console.error("[FairBloom] Submit transaction error:", err.message);
-    res.status(500).json({ message: "Server error submitting transaction" });
-  }
-};
 
 /**
  * @route   GET /api/transactions
@@ -99,7 +34,7 @@ const getTransactions = async (req, res) => {
 
 /**
  * @route   GET /api/transactions/mine
- * @desc    Your own history: sales you reported AND deals you were part of.
+ * @desc    Your own history: deals you were part of, plus any older records.
  */
 const getMyTransactions = async (req, res) => {
   try {
@@ -214,10 +149,4 @@ const reviewTransaction = async (req, res) => {
   }
 };
 
-module.exports = {
-  submitTransaction,
-  getTransactions,
-  getMyTransactions,
-  getPendingTransactions,
-  reviewTransaction,
-};
+module.exports = { getTransactions, getMyTransactions, getPendingTransactions, reviewTransaction };
