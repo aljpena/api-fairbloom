@@ -50,4 +50,22 @@ mongoose.connection.on("reconnected", () => {
   console.log("[FairBloom] MongoDB reconnected.");
 });
 
+// For serverless (Vercel): connect once per warm instance and reuse it across requests.
+// Throws instead of exiting, so a failed attempt is retried on the next request.
+let pending = null;
+const ensureDB = () => {
+  if (mongoose.connection.readyState === 1) return Promise.resolve();
+  if (!pending) {
+    if (!process.env.MONGO_URI) return Promise.reject(new Error("MONGO_URI is not set"));
+    pending = mongoose
+      .connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000, family: 4 })
+      .catch((err) => {
+        pending = null;
+        throw err;
+      });
+  }
+  return pending;
+};
+
 module.exports = connectDB;
+module.exports.ensureDB = ensureDB;

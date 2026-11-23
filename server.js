@@ -1,210 +1,114 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
-const rateLimit = require("express-rate-limit");
-const http = require("http");
-const jwt = require("jsonwebtoken");
-const { Server } = require("socket.io");
-const mongoose = require("mongoose");
+// Long-running server (local dev, Render, Railway, a VPS...): the Express app from app.js
+// plus Socket.IO for real-time events. On Vercel there is no long-running process, so this
+// file just exports the app (app.js connects to MongoDB per request there).
+const app = require("./app");
 
-const connectDB = require("./config/db");
-const { warmUpEmail } = require("./utils/sendEmail");
-const User = require("./models/User");
-const Conversation = require("./models/Conversation");
-const { setIO } = require("./utils/socket");
-
-const app = express();
-const server = http.createServer(app);
-
-// Behind a reverse proxy / PaaS load balancer (Render, Railway, Heroku, Nginx...),
-// set TRUST_PROXY=1 so rate limiting and logs see the real client IP.
-const trustProxy = process.env.TRUST_PROXY;
-if (trustProxy) {
-  app.set(
-    "trust proxy",
-    trustProxy === "true" ? true : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy
-  );
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  startServer();
 }
 
-// ---- Allowed origins (admin panel dev server, mobile app dev server) ----
-const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
+function startServer() {
+  const http = require("http");
+  const jwt = require("jsonwebtoken");
+  const { Server } = require("socket.io");
+  const mongoose = require("mongoose");
 
-// In development, also accept localhost and private-LAN origins on any port,
-// so a changing Wi-Fi IP or dev-server port doesn't break CORS.
-const isDev = process.env.NODE_ENV !== "production";
+  const connectDB = require("./config/db");
+  const { corsOriginValidator } = require("./config/cors");
+  const { warmUpEmail } = require("./utils/sendEmail");
+  const User = require("./models/User");
+  const Conversation = require("./models/Conversation");
+  const { setIO } = require("./utils/socket");
 
-// Fail fast on missing secrets instead of crashing on the first login.
-if (!process.env.JWT_SECRET) {
-  console.error("[FairBloom] JWT_SECRET is not set. Refusing to start.");
-  process.exit(1);
-}
-if (!isDev && !allowedOrigins.length) {
-  console.warn(
-    "[FairBloom] Warning: CLIENT_ORIGIN is empty, so CORS allows every origin. " +
-      "Set it to the admin web URL(s) in production."
-  );
-}
-const devOriginPattern =
-  /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+  const server = http.createServer(app);
 
-const corsOriginValidator = (origin, callback) => {
-  if (!origin) return callback(null, true);
+  // ---- Socket.IO (real-time delivery of messages) ----
+  const io = new Server(server, {
+    cors: {
+      origin: corsOriginValidator,
+      credentials: true,
+    },
+  });
+  setIO(io);
 
-  if (!allowedOrigins.length || allowedOrigins.includes(origin)) {
-    return callback(null, true);
-  }
-
-  if (isDev && devOriginPattern.test(origin)) {
-    return callback(null, true);
-  }
-
-  console.warn(`[FairBloom] CORS blocked origin: ${origin}`);
-
-  return callback(new Error("Origin not allowed by CORS"));
-};
-
-// ---- Core middleware ----
-app.use(helmet());
-app.use(
-  cors({
-    origin: corsOriginValidator,
-    credentials: true,
-  })
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
-
-// Basic rate limiting (protects auth + submission endpoints from abuse)
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use("/api", apiLimiter);
-
-// ---- Health check ----
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", service: "FairBloom API", time: new Date().toISOString() });
-});
-
-// ---- Routes ----
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/listings", require("./routes/listingRoutes"));
-app.use("/api/transactions", require("./routes/transactionRoutes"));
-app.use("/api/pricing", require("./routes/pricingRoutes"));
-app.use("/api/conversations", require("./routes/conversationRoutes"));
-app.use("/api/deals", require("./routes/dealRoutes"));
-app.use("/api/users", require("./routes/userRoutes"));
-app.use("/api/admin", require("./routes/adminRoutes"));
-app.use("/api/files", require("./routes/fileRoutes"));
-app.use("/api/notifications", require("./routes/notificationRoutes"));
-
-// ---- 404 handler ----
-app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
-});
-
-// ---- Global error handler ----
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  const status = err.status || err.statusCode || 500;
-  // Don't leak internal error details (DB errors, stack info) to clients in production.
-  const message =
-    status >= 500 && !isDev ? "Internal server error" : err.message || "Internal server error";
-  res.status(status).json({ message });
-});
-
-// ---- Socket.IO (real-time delivery of messages) ----
-const io = new Server(server, {
-  cors: {
-    origin: corsOriginValidator,
-    credentials: true,
-  },
-});
-setIO(io);
-
-// Authentication: runs once per connection, before "connection" fires.
-// The client must connect like:  io(URL, { auth: { token: "<JWT>" } })
-io.use(async (socket, next) => {
-  try {
-    const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Authentication required"));
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user || !user.isActive) return next(new Error("Authentication failed"));
-    if (
-      user.passwordChangedAt &&
-      decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
-    ) {
-      return next(new Error("Authentication failed"));
-    }
-    socket.user = user; // available in every handler below
-    next();
-  } catch (err) {
-    next(new Error("Authentication failed"));
-  }
-});
-
-io.on("connection", (socket) => {
-  console.log(`[FairBloom] Socket connected: ${socket.id} (${socket.user.email})`);
-  socket.join(`user:${socket.user._id}`);
-
-  // Authorization: only participants may join a conversation's room.
-  // The optional `ack` callback tells the client whether joining worked.
-  socket.on("join_room", async (conversationId, ack) => {
-    const reply = typeof ack === "function" ? ack : () => {};
+  // Authentication: runs once per connection, before "connection" fires.
+  // The client must connect like:  io(URL, { auth: { token: "<JWT>" } })
+  io.use(async (socket, next) => {
     try {
-      const conversation = await Conversation.findById(conversationId);
-      const isParticipant =
-        conversation &&
-        conversation.participants.some((p) => p.toString() === socket.user._id.toString());
+      const token = socket.handshake.auth?.token;
+      if (!token) return next(new Error("Authentication required"));
 
-      if (!isParticipant) {
-        return reply({ ok: false, message: "You're not part of this conversation" });
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.id);
+      if (!user || !user.isActive) return next(new Error("Authentication failed"));
+      if (
+        user.passwordChangedAt &&
+        decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
+      ) {
+        return next(new Error("Authentication failed"));
       }
-
-      socket.join(conversationId);
-      reply({ ok: true });
+      socket.user = user; // available in every handler below
+      next();
     } catch (err) {
-      reply({ ok: false, message: "Could not join conversation" });
+      next(new Error("Authentication failed"));
     }
   });
 
-  socket.on("disconnect", () => {
-    console.log(`[FairBloom] Socket disconnected: ${socket.id}`);
+  io.on("connection", (socket) => {
+    console.log(`[FairBloom] Socket connected: ${socket.id} (${socket.user.email})`);
+    socket.join(`user:${socket.user._id}`);
+
+    // Authorization: only participants may join a conversation's room.
+    // The optional `ack` callback tells the client whether joining worked.
+    socket.on("join_room", async (conversationId, ack) => {
+      const reply = typeof ack === "function" ? ack : () => {};
+      try {
+        const conversation = await Conversation.findById(conversationId);
+        const isParticipant =
+          conversation &&
+          conversation.participants.some((p) => p.toString() === socket.user._id.toString());
+
+        if (!isParticipant) {
+          return reply({ ok: false, message: "You're not part of this conversation" });
+        }
+
+        socket.join(conversationId);
+        reply({ ok: true });
+      } catch (err) {
+        reply({ ok: false, message: "Could not join conversation" });
+      }
+    });
+
+    socket.on("disconnect", () => {
+      console.log(`[FairBloom] Socket disconnected: ${socket.id}`);
+    });
   });
-});
 
-const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || 5000;
 
-// ---- Start server after DB connects ----
-connectDB().then(() => {
-  warmUpEmail();
-  server.listen(PORT, () => {
-    console.log(
-      `[FairBloom] Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`
-    );
+  // ---- Start server after DB connects ----
+  connectDB().then(() => {
+    warmUpEmail();
+    server.listen(PORT, () => {
+      console.log(
+        `[FairBloom] Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`
+      );
+    });
   });
-});
 
-// ---- Graceful shutdown (hosts send SIGTERM on redeploy/restart) ----
-const shutdown = (signal) => {
-  console.log(`[FairBloom] ${signal} received, shutting down...`);
-  io.close();
-  server.close(() => {
-    mongoose.connection.close(false).finally(() => process.exit(0));
-  });
-  setTimeout(() => process.exit(1), 10000).unref();
-};
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+  // ---- Graceful shutdown (hosts send SIGTERM on redeploy/restart) ----
+  const shutdown = (signal) => {
+    console.log(`[FairBloom] ${signal} received, shutting down...`);
+    io.close();
+    server.close(() => {
+      mongoose.connection.close(false).finally(() => process.exit(0));
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
-module.exports = { app, server, io };
+  module.exports = { app, server, io };
+}

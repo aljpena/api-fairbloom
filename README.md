@@ -24,6 +24,19 @@ Express + MongoDB + Socket.IO backend for FairBloom.
 
 ## Deploying
 
+### Vercel
+
+`app.js` exports the Express app, and Vercel runs it as a serverless function. MongoDB connects on
+the first request and the connection is reused while the instance stays warm.
+
+- Framework Preset: **Express** (Project → Settings → Build & Deployment). Leave the build and output settings empty.
+- Set the environment variables listed below. `TRUST_PROXY` is set automatically on Vercel.
+- MongoDB Atlas → Network Access must allow `0.0.0.0/0`, because Vercel has no fixed outbound IPs.
+- Limits: Socket.IO doesn't run on Vercel. The mobile app polls instead, so it isn't needed. Request
+  bodies are capped at 4.5 MB, so larger image uploads fail with a 413 error.
+
+### Other hosts
+
 There is no build step. Any Node 18+ host (Render, Railway, a VPS with PM2, etc.) works:
 
 - **Install:** `npm ci --omit=dev`
