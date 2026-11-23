@@ -23,12 +23,24 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
+// In development, also accept localhost and private-LAN origins on any port,
+// so a changing Wi-Fi IP or dev-server port doesn't break CORS.
+const isDev = process.env.NODE_ENV !== "production";
+const devOriginPattern =
+  /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+
 const corsOriginValidator = (origin, callback) => {
   if (!origin) return callback(null, true);
 
   if (!allowedOrigins.length || allowedOrigins.includes(origin)) {
     return callback(null, true);
   }
+
+  if (isDev && devOriginPattern.test(origin)) {
+    return callback(null, true);
+  }
+
+  console.warn(`[FairBloom] CORS blocked origin: ${origin}`);
 
   return callback(new Error("Origin not allowed by CORS"));
 };
