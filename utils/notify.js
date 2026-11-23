@@ -10,10 +10,18 @@ async function sendPush(userId, { title, body, data }) {
   const tokens = await PushToken.find({ user: userId }).lean();
   if (!tokens.length) return;
 
-  const messages = tokens.map((t) => ({ to: t.token, title, body, data, sound: "default", priority: "high" }));
+  const messages = tokens.map((t) => ({
+    to: t.token,
+    title,
+    body,
+    data,
+    sound: "default",
+    priority: "high",
+  }));
 
   const headers = { "Content-Type": "application/json", Accept: "application/json" };
-  if (process.env.EXPO_ACCESS_TOKEN) headers.Authorization = `Bearer ${process.env.EXPO_ACCESS_TOKEN}`;
+  if (process.env.EXPO_ACCESS_TOKEN)
+    headers.Authorization = `Bearer ${process.env.EXPO_ACCESS_TOKEN}`;
 
   const res = await fetch(EXPO_PUSH_URL, {
     method: "POST",
@@ -70,7 +78,8 @@ function notify(userIds, payload) {
   const ids = [].concat(userIds).filter(Boolean);
   return Promise.allSettled(ids.map((id) => notifyOne(id, payload))).then((results) => {
     results.forEach((r) => {
-      if (r.status === "rejected") console.error("[FairBloom] Notification failed:", r.reason && r.reason.message);
+      if (r.status === "rejected")
+        console.error("[FairBloom] Notification failed:", r.reason && r.reason.message);
     });
   });
 }
@@ -79,7 +88,12 @@ function notifyAdmins(payload) {
   return User.find({ role: "admin", isActive: true })
     .select("_id")
     .lean()
-    .then((admins) => notify(admins.map((a) => a._id), payload))
+    .then((admins) =>
+      notify(
+        admins.map((a) => a._id),
+        payload
+      )
+    )
     .catch((err) => console.error("[FairBloom] Admin notification failed:", err.message));
 }
 

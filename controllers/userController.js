@@ -38,7 +38,9 @@ const updateProfile = async (req, res) => {
 
     const provided = editable.filter((f) => req.body[f] !== undefined);
     if (provided.length === 0) {
-      return res.status(400).json({ message: `Nothing to update. Editable fields: ${editable.join(", ")}` });
+      return res
+        .status(400)
+        .json({ message: `Nothing to update. Editable fields: ${editable.join(", ")}` });
     }
 
     provided.forEach((f) => {
@@ -169,7 +171,10 @@ const submitVerificationDocument = async (req, res) => {
       subject: user._id,
     });
 
-    res.json({ message: "Document received. An administrator will review it.", verificationStatus: "pending" });
+    res.json({
+      message: "Document received. An administrator will review it.",
+      verificationStatus: "pending",
+    });
   } catch (err) {
     console.error("[FairBloom] Submit verification document error:", err.message);
     res.status(500).json({ message: "Server error uploading document" });

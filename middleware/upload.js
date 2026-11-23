@@ -24,8 +24,8 @@ const uploadImage = (field) => (req, res, next) => {
         err.code === "LIMIT_FILE_SIZE"
           ? `Image is too large (max ${MAX_MB} MB)`
           : err.code === "LIMIT_UNEXPECTED_FILE"
-          ? `Unexpected file field. Send the image in the '${field}' field`
-          : err.message;
+            ? `Unexpected file field. Send the image in the '${field}' field`
+            : err.message;
       return res.status(400).json({ message });
     }
     if (err.code === "BAD_FILE_TYPE") return res.status(400).json({ message: err.message });

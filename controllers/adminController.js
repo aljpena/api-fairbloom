@@ -103,7 +103,10 @@ const setUserStatus = async (req, res) => {
       return res.status(403).json({ message: "Admin accounts can't be deactivated here" });
     }
     if (user.isActive === isActive) {
-      return res.json({ user, message: `Account is already ${isActive ? "active" : "deactivated"}` });
+      return res.json({
+        user,
+        message: `Account is already ${isActive ? "active" : "deactivated"}`,
+      });
     }
 
     if (isActive) {
@@ -153,7 +156,9 @@ const setUserStatus = async (req, res) => {
  */
 const downloadBackup = async (req, res) => {
   if (process.env.NODE_ENV === "production" && !process.env.BACKUP_PASSPHRASE) {
-    return res.status(400).json({ message: "Set BACKUP_PASSPHRASE before downloading backups in production." });
+    return res
+      .status(400)
+      .json({ message: "Set BACKUP_PASSPHRASE before downloading backups in production." });
   }
 
   try {
@@ -216,11 +221,17 @@ const eraseUserByAdmin = async (req, res) => {
  */
 const listVerifications = async (req, res) => {
   try {
-    const status = ["pending", "approved", "rejected"].includes(req.query.status) ? req.query.status : "pending";
+    const status = ["pending", "approved", "rejected"].includes(req.query.status)
+      ? req.query.status
+      : "pending";
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
 
-    const filter = { role: { $in: ["farmer", "buyer"] }, isEmailVerified: true, verificationStatus: status };
+    const filter = {
+      role: { $in: ["farmer", "buyer"] },
+      isEmailVerified: true,
+      verificationStatus: status,
+    };
 
     const [rows, total] = await Promise.all([
       User.find(filter)
@@ -271,7 +282,9 @@ const reviewVerification = async (req, res) => {
 
     const approved = decision === "approve";
     if (approved && !user.verificationDocument) {
-      return res.status(400).json({ message: "No document on file. Ask the user to upload one first." });
+      return res
+        .status(400)
+        .json({ message: "No document on file. Ask the user to upload one first." });
     }
 
     user.verificationStatus = approved ? "approved" : "rejected";

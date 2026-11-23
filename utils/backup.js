@@ -14,7 +14,9 @@ const { createBackup, saveBackupToDisk } = require("./backupService");
     if (!encrypted) {
       console.warn("[FairBloom] Not encrypted. Set BACKUP_PASSPHRASE in .env to encrypt backups.");
     }
-    console.warn("[FairBloom] This file contains personal data. Store it securely and delete it when the study ends.");
+    console.warn(
+      "[FairBloom] This file contains personal data. Store it securely and delete it when the study ends."
+    );
 
     await mongoose.connection.close();
     process.exit(0);

@@ -23,7 +23,11 @@ const listNotifications = async (req, res) => {
       Notification.countDocuments({ user: req.user._id, isRead: false }),
     ]);
 
-    res.json({ notifications, unreadCount, pagination: { total, page, pages: Math.ceil(total / limit) } });
+    res.json({
+      notifications,
+      unreadCount,
+      pagination: { total, page, pages: Math.ceil(total / limit) },
+    });
   } catch (err) {
     console.error("[FairBloom] List notifications error:", err.message);
     res.status(500).json({ message: "Server error fetching notifications" });
@@ -33,7 +37,9 @@ const listNotifications = async (req, res) => {
 /** @route GET /api/notifications/unread-count (for the badge) */
 const unreadCount = async (req, res) => {
   try {
-    res.json({ unreadCount: await Notification.countDocuments({ user: req.user._id, isRead: false }) });
+    res.json({
+      unreadCount: await Notification.countDocuments({ user: req.user._id, isRead: false }),
+    });
   } catch (err) {
     console.error("[FairBloom] Unread count error:", err.message);
     res.status(500).json({ message: "Server error fetching unread count" });
@@ -51,7 +57,8 @@ const markRead = async (req, res) => {
     if (!notification) return res.status(404).json({ message: "Notification not found" });
     res.json({ notification });
   } catch (err) {
-    if (err.name === "CastError") return res.status(400).json({ message: "Invalid notification id" });
+    if (err.name === "CastError")
+      return res.status(400).json({ message: "Invalid notification id" });
     console.error("[FairBloom] Mark read error:", err.message);
     res.status(500).json({ message: "Server error updating notification" });
   }
@@ -105,4 +112,11 @@ const removePushToken = async (req, res) => {
   }
 };
 
-module.exports = { listNotifications, unreadCount, markRead, markAllRead, registerPushToken, removePushToken };
+module.exports = {
+  listNotifications,
+  unreadCount,
+  markRead,
+  markAllRead,
+  registerPushToken,
+  removePushToken,
+};

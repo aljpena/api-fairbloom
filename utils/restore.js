@@ -31,7 +31,9 @@ const {
   await connectDB();
   const dbName = mongoose.connection.name;
 
-  console.log(`\nBackup made : ${backup.createdAt.toISOString()} (from database '${backup.database}')`);
+  console.log(
+    `\nBackup made : ${backup.createdAt.toISOString()} (from database '${backup.database}')`
+  );
   console.log("Contains    :", JSON.stringify(backup.counts));
   warnings.forEach((w) => console.warn("WARNING     :", w));
   console.log(`\nThis will REPLACE ALL DATA in database '${dbName}'.`);

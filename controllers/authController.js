@@ -65,11 +65,14 @@ const register = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { name, email, phone, password, role, farmLocation, buyerCategory, businessLocation } = req.body;
+  const { name, email, phone, password, role, farmLocation, buyerCategory, businessLocation } =
+    req.body;
 
   if (!req.file) {
     const what = role === "farmer" ? "Farmer ID" : "Business Permit";
-    return res.status(400).json({ message: `Please attach a photo of your ${what} (form field 'document')` });
+    return res
+      .status(400)
+      .json({ message: `Please attach a photo of your ${what} (form field 'document')` });
   }
 
   try {
@@ -131,7 +134,8 @@ const register = async (req, res) => {
     } catch (mailErr) {
       console.error("[FairBloom] Send OTP email failed:", mailErr.message);
       return res.status(502).json({
-        message: "Account created, but we couldn't send the verification email. Please tap 'Resend code'.",
+        message:
+          "Account created, but we couldn't send the verification email. Please tap 'Resend code'.",
         email: user.email,
       });
     }
@@ -170,7 +174,9 @@ const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired code" });
     }
     if (user.otpAttempts >= OTP_MAX_ATTEMPTS) {
-      return res.status(429).json({ message: "Too many incorrect attempts. Please request a new code." });
+      return res
+        .status(429)
+        .json({ message: "Too many incorrect attempts. Please request a new code." });
     }
     if (user.otpExpiresAt < new Date()) {
       return res.status(400).json({ message: "This code has expired. Please request a new one." });
@@ -220,7 +226,9 @@ const resendOtp = async (req, res) => {
   }
 
   const { email } = req.body;
-  const genericReply = { message: "If this email is awaiting verification, a new code has been sent." };
+  const genericReply = {
+    message: "If this email is awaiting verification, a new code has been sent.",
+  };
 
   try {
     const user = await User.findOne({ email }).select("+otpLastSentAt");
@@ -244,7 +252,9 @@ const resendOtp = async (req, res) => {
       await sendOtpEmail(user.email, user.name, otp, OTP_EXPIRY_MINUTES);
     } catch (mailErr) {
       console.error("[FairBloom] Resend OTP email failed:", mailErr.message);
-      return res.status(502).json({ message: "We couldn't send the email. Please try again shortly." });
+      return res
+        .status(502)
+        .json({ message: "We couldn't send the email. Please try again shortly." });
     }
 
     res.json(genericReply);

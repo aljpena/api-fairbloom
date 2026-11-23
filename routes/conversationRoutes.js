@@ -28,9 +28,23 @@ const imageLimiter = rateLimit({
 router.post("/", protect, requireApproved, startConversation);
 router.get("/", protect, getConversations);
 router.get("/:id/messages", protect, getMessages);
-router.post("/:id/messages", protect, requireApproved, imageLimiter, uploadImage("image"), sendMessage);
+router.post(
+  "/:id/messages",
+  protect,
+  requireApproved,
+  imageLimiter,
+  uploadImage("image"),
+  sendMessage
+);
 
 router.get("/:id/deals", protect, getConversationDeals);
-router.post("/:id/deals", protect, authorize("farmer", "buyer"), requireApproved, dealValidation, proposeDeal);
+router.post(
+  "/:id/deals",
+  protect,
+  authorize("farmer", "buyer"),
+  requireApproved,
+  dealValidation,
+  proposeDeal
+);
 
 module.exports = router;

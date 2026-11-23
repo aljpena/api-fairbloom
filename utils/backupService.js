@@ -118,14 +118,17 @@ function parseBackup(buffer) {
   for (const name of Object.keys(MODELS)) {
     const docs = backup.data && backup.data[name];
     if (!Array.isArray(docs)) throw new Error(`Backup is missing the '${name}' collection`);
-    if (docs.some((d) => !d || !d._id)) throw new Error(`Backup has a malformed record in '${name}'`);
+    if (docs.some((d) => !d || !d._id))
+      throw new Error(`Backup has a malformed record in '${name}'`);
     if (!backup.counts || backup.counts[name] !== docs.length) {
       throw new Error(`Record count mismatch in '${name}' (the file may be truncated)`);
     }
   }
 
   if (!backup.data.users.some((u) => u.role === "admin")) {
-    warnings.push("This backup has no admin account. You'd be locked out of the admin routes after restoring.");
+    warnings.push(
+      "This backup has no admin account. You'd be locked out of the admin routes after restoring."
+    );
   }
 
   return { backup, warnings };

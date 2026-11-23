@@ -26,7 +26,9 @@ const PHRASE = "DELETE ALL PARTICIPANT DATA";
 
   const result = await purgeAllParticipantData();
   console.log("\n[FairBloom] Purged:", JSON.stringify(result));
-  console.log("[FairBloom] Backup files still contain the old data. Delete them too (backups/ folder).");
+  console.log(
+    "[FairBloom] Backup files still contain the old data. Delete them too (backups/ folder)."
+  );
 
   await mongoose.connection.close();
   process.exit(0);

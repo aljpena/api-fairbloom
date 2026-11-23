@@ -31,7 +31,16 @@ const listingSchema = new mongoose.Schema(
 
     location: {
       type: String,
-      enum: ["Beckel", "Bahong", "Ambiong", "Bineng", "Tublay", "Sablan", "Baguio City", "La Trinidad"],
+      enum: [
+        "Beckel",
+        "Bahong",
+        "Ambiong",
+        "Bineng",
+        "Tublay",
+        "Sablan",
+        "Baguio City",
+        "La Trinidad",
+      ],
       required: true,
     },
 

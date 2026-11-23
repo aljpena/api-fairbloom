@@ -1,7 +1,7 @@
 const { io } = require("socket.io-client");
 
 const URL = "http://localhost:5000";
-const TOKEN = process.argv[2];           // a valid JWT
+const TOKEN = process.argv[2]; // a valid JWT
 const CONVERSATION_ID = process.argv[3]; // a conversation id
 
 const socket = io(URL, { auth: { token: TOKEN } });

@@ -131,10 +131,11 @@ const sendMessage = async (req, res) => {
   }
 
   try {
-    const { conversation, error, message: guardMessage } = await assertParticipant(
-      req.params.id,
-      req.user._id
-    );
+    const {
+      conversation,
+      error,
+      message: guardMessage,
+    } = await assertParticipant(req.params.id, req.user._id);
     if (error) return res.status(error).json({ message: guardMessage });
 
     let fileDoc = null;

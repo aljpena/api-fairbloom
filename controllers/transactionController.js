@@ -77,7 +77,11 @@ const getMyTransactions = async (req, res) => {
       };
     });
 
-    res.json({ transactions, summary, pagination: { total, page, pages: Math.ceil(total / limit) } });
+    res.json({
+      transactions,
+      summary,
+      pagination: { total, page, pages: Math.ceil(total / limit) },
+    });
   } catch (err) {
     console.error("[FairBloom] Get my transactions error:", err.message);
     res.status(500).json({ message: "Server error fetching your transaction history" });
@@ -129,7 +133,9 @@ const reviewTransaction = async (req, res) => {
     await transaction.save();
 
     const parties = [
-      ...new Set([transaction.submittedBy, transaction.farmer, transaction.buyer].filter(Boolean).map(String)),
+      ...new Set(
+        [transaction.submittedBy, transaction.farmer, transaction.buyer].filter(Boolean).map(String)
+      ),
     ];
     const ok = transaction.status === "approved";
     notify(parties, {
@@ -143,7 +149,8 @@ const reviewTransaction = async (req, res) => {
 
     res.json({ transaction });
   } catch (err) {
-    if (err.name === "CastError") return res.status(400).json({ message: "Invalid transaction id" });
+    if (err.name === "CastError")
+      return res.status(400).json({ message: "Invalid transaction id" });
     console.error("[FairBloom] Review transaction error:", err.message);
     res.status(500).json({ message: "Server error reviewing transaction" });
   }

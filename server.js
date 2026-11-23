@@ -7,6 +7,7 @@ const rateLimit = require("express-rate-limit");
 const http = require("http");
 const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
+const mongoose = require("mongoose");
 
 const connectDB = require("./config/db");
 const { warmUpEmail } = require("./utils/sendEmail");
@@ -17,6 +18,16 @@ const { setIO } = require("./utils/socket");
 const app = express();
 const server = http.createServer(app);
 
+// Behind a reverse proxy / PaaS load balancer (Render, Railway, Heroku, Nginx...),
+// set TRUST_PROXY=1 so rate limiting and logs see the real client IP.
+const trustProxy = process.env.TRUST_PROXY;
+if (trustProxy) {
+  app.set(
+    "trust proxy",
+    trustProxy === "true" ? true : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy
+  );
+}
+
 // ---- Allowed origins (admin panel dev server, mobile app dev server) ----
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
   .split(",")
@@ -26,6 +37,18 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
 // In development, also accept localhost and private-LAN origins on any port,
 // so a changing Wi-Fi IP or dev-server port doesn't break CORS.
 const isDev = process.env.NODE_ENV !== "production";
+
+// Fail fast on missing secrets instead of crashing on the first login.
+if (!process.env.JWT_SECRET) {
+  console.error("[FairBloom] JWT_SECRET is not set. Refusing to start.");
+  process.exit(1);
+}
+if (!isDev && !allowedOrigins.length) {
+  console.warn(
+    "[FairBloom] Warning: CLIENT_ORIGIN is empty, so CORS allows every origin. " +
+      "Set it to the admin web URL(s) in production."
+  );
+}
 const devOriginPattern =
   /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
 
@@ -91,9 +114,11 @@ app.use((req, res) => {
 // ---- Global error handler ----
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(err.status || 500).json({
-    message: err.message || "Internal server error",
-  });
+  const status = err.status || err.statusCode || 500;
+  // Don't leak internal error details (DB errors, stack info) to clients in production.
+  const message =
+    status >= 500 && !isDev ? "Internal server error" : err.message || "Internal server error";
+  res.status(status).json({ message });
 });
 
 // ---- Socket.IO (real-time delivery of messages) ----
@@ -115,7 +140,10 @@ io.use(async (socket, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
     if (!user || !user.isActive) return next(new Error("Authentication failed"));
-    if (user.passwordChangedAt && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+    if (
+      user.passwordChangedAt &&
+      decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
+    ) {
       return next(new Error("Authentication failed"));
     }
     socket.user = user; // available in every handler below
@@ -161,8 +189,22 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(() => {
   warmUpEmail();
   server.listen(PORT, () => {
-    console.log(`[FairBloom] Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
+    console.log(
+      `[FairBloom] Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`
+    );
   });
 });
+
+// ---- Graceful shutdown (hosts send SIGTERM on redeploy/restart) ----
+const shutdown = (signal) => {
+  console.log(`[FairBloom] ${signal} received, shutting down...`);
+  io.close();
+  server.close(() => {
+    mongoose.connection.close(false).finally(() => process.exit(0));
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 module.exports = { app, server, io };

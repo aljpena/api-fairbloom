@@ -18,7 +18,10 @@ const protect = async (req, res, next) => {
     }
 
     // iat is in seconds. A token issued before the last password change is dead.
-    if (user.passwordChangedAt && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+    if (
+      user.passwordChangedAt &&
+      decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
+    ) {
       return res.status(401).json({ message: "Password was changed, please log in again" });
     }
 

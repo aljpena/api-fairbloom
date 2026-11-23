@@ -1,7 +1,16 @@
 const { body } = require("express-validator");
 const { VARIETIES, canonicalVariety } = require("../config/varieties");
 
-const LOCATIONS = ["Beckel", "Bahong", "Ambiong", "Bineng", "Tublay", "Sablan", "Baguio City", "La Trinidad"];
+const LOCATIONS = [
+  "Beckel",
+  "Bahong",
+  "Ambiong",
+  "Bineng",
+  "Tublay",
+  "Sablan",
+  "Baguio City",
+  "La Trinidad",
+];
 
 // Normalizes to the canonical spelling, then requires it to be on the list.
 const varietyField = () =>
@@ -38,7 +47,10 @@ const loginValidation = [
 
 const verifyEmailValidation = [
   body("email").isEmail().withMessage("A valid email is required").normalizeEmail(),
-  body("otp").trim().matches(/^\d{6}$/).withMessage("Code must be exactly 6 digits"),
+  body("otp")
+    .trim()
+    .matches(/^\d{6}$/)
+    .withMessage("Code must be exactly 6 digits"),
 ];
 
 const resendOtpValidation = [
@@ -63,7 +75,10 @@ const listingValidation = [
     .isFloat({ min: 0 })
     .withMessage("Price per unit must be a positive number"),
   body("location").isIn(LOCATIONS).withMessage("A valid location is required"),
-  body("description").optional().isLength({ max: 500 }).withMessage("Description too long (max 500 chars)"),
+  body("description")
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage("Description too long (max 500 chars)"),
 ];
 
 const transactionValidation = [
@@ -116,7 +131,10 @@ const userStatusValidation = [
 ];
 
 const adminEraseValidation = [
-  body("confirmEmail").isEmail().withMessage("confirmEmail must be the user's email").normalizeEmail(),
+  body("confirmEmail")
+    .isEmail()
+    .withMessage("confirmEmail must be the user's email")
+    .normalizeEmail(),
   body("transactions")
     .isIn(["anonymize", "delete"])
     .withMessage("transactions must be 'anonymize' or 'delete'"),
@@ -125,7 +143,9 @@ const adminEraseValidation = [
 const selfEraseValidation = [body("password").notEmpty().withMessage("Password is required")];
 
 const verificationDecisionValidation = [
-  body("decision").isIn(["approve", "reject"]).withMessage("decision must be 'approve' or 'reject'"),
+  body("decision")
+    .isIn(["approve", "reject"])
+    .withMessage("decision must be 'approve' or 'reject'"),
   body("reason")
     .if(body("decision").equals("reject"))
     .trim()
@@ -140,7 +160,10 @@ const pushTokenValidation = [
     .trim()
     .matches(/^(Exponent|Expo)PushToken\[.+\]$/)
     .withMessage("Invalid Expo push token"),
-  body("platform").optional().isIn(["android", "ios"]).withMessage("platform must be 'android' or 'ios'"),
+  body("platform")
+    .optional()
+    .isIn(["android", "ios"])
+    .withMessage("platform must be 'android' or 'ios'"),
 ];
 
 module.exports = {

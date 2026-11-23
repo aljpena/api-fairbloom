@@ -36,7 +36,11 @@ const userSchema = new mongoose.Schema(
     otpAttempts: { type: Number, default: 0, select: false },
     otpLastSentAt: { type: Date, select: false },
     // Document verification (Farmer ID for farmers, Business Permit for buyers), reviewed by an admin
-    verificationStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    verificationStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
     verificationDocument: { type: mongoose.Schema.Types.ObjectId, ref: "File", default: null },
     verificationNote: { type: String, trim: true, maxlength: 300 }, // rejection reason shown to the user
     verificationReviewedAt: { type: Date },

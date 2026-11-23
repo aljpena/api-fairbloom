@@ -41,7 +41,9 @@ const proposeDeal = async (req, res) => {
     const farmer = users.find((u) => u.role === "farmer");
     const buyer = users.find((u) => u.role === "buyer");
     if (users.length !== 2 || !farmer || !buyer) {
-      return res.status(400).json({ message: "Deals can only be made between a farmer and a buyer" });
+      return res
+        .status(400)
+        .json({ message: "Deals can only be made between a farmer and a buyer" });
     }
 
     const other = String(farmer._id) === me ? buyer : farmer;
@@ -74,7 +76,8 @@ const proposeDeal = async (req, res) => {
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({
-        message: "There's already an open proposal in this conversation. Accept, decline, or cancel it first.",
+        message:
+          "There's already an open proposal in this conversation. Accept, decline, or cancel it first.",
       });
     }
     if (err.name === "CastError") return res.status(400).json({ message: "Invalid id" });
@@ -113,14 +116,18 @@ const getConversationDeals = async (req, res) => {
  *  3. The transaction is created through the normal fraud pipeline.
  */
 async function acceptDeal(req, res, deal) {
-  const [farmer, buyer] = await Promise.all([User.findById(deal.farmer), User.findById(deal.buyer)]);
+  const [farmer, buyer] = await Promise.all([
+    User.findById(deal.farmer),
+    User.findById(deal.buyer),
+  ]);
 
   if (!farmer || !buyer || !farmer.isActive || !buyer.isActive) {
     return res.status(400).json({ message: "One of the accounts in this deal is unavailable" });
   }
   if (!checkDailyQuota(farmer) || !checkDailyQuota(buyer)) {
     return res.status(429).json({
-      message: "You or the other party has reached the daily submission limit. Please try again tomorrow.",
+      message:
+        "You or the other party has reached the daily submission limit. Please try again tomorrow.",
     });
   }
 
@@ -146,7 +153,10 @@ async function acceptDeal(req, res, deal) {
     });
   } catch (err) {
     // Roll the claim back so the deal can be accepted again.
-    await Deal.updateOne({ _id: deal._id }, { $set: { status: "proposed" }, $unset: { respondedAt: 1 } });
+    await Deal.updateOne(
+      { _id: deal._id },
+      { $set: { status: "proposed" }, $unset: { respondedAt: 1 } }
+    );
     throw err;
   }
 

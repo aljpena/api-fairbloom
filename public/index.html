@@ -1,243 +1,267 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>FairBloom — API Test Dashboard</title>
-<style>
-  :root {
-    --pink: #d6336c;
-    --green: #2f9e44;
-    --bg: #faf7f5;
-    --card: #ffffff;
-    --border: #e5dfda;
-    --text: #2b2b2b;
-    --muted: #7a7a7a;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    margin: 0;
-    padding: 24px;
-  }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 16px;
-    align-items: start;
-  }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
-  }
-  .card h2 { font-size: 15px; margin: 0 0 12px; }
-  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
-  input, select, textarea {
-    width: 100%;
-    padding: 7px 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 13px;
-  }
-  button {
-    margin-top: 12px;
-    padding: 8px 14px;
-    border: none;
-    border-radius: 6px;
-    background: var(--pink);
-    color: white;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  button.secondary { background: #555; }
-  button.small { padding: 4px 8px; font-size: 12px; margin: 2px 4px 2px 0; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-  .tabs button {
-    background: #eee;
-    color: #333;
-    margin: 0;
-  }
-  .tabs button.active { background: var(--pink); color: white; }
-  pre {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    padding: 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    max-height: 160px;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .session-bar {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 16px;
-    margin-bottom: 16px;
-    font-size: 13px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .badge.farmer { background: #ebfbee; color: var(--green); }
-  .badge.buyer { background: #fff0f6; color: var(--pink); }
-  .badge.admin { background: #e7f5ff; color: #1971c2; }
-  .badge.none { background: #f1f3f5; color: var(--muted); }
-  .listing-row {
-    border-bottom: 1px solid var(--border);
-    padding: 8px 0;
-    font-size: 13px;
-  }
-  .listing-row:last-child { border-bottom: none; }
-  .listing-meta { color: var(--muted); font-size: 11px; }
-  .hidden { display: none; }
-</style>
-</head>
-<body>
-
-<h1>🌸 FairBloom — API Test Dashboard</h1>
-<div class="subtitle">Local testing UI for the auth + listings routes. Talks to this same server's /api endpoints.</div>
-
-<div class="session-bar">
-  <div id="sessionInfo">Not logged in <span class="badge none">guest</span></div>
-  <div>
-    <button class="small secondary" onclick="logout()">Log out</button>
-  </div>
-</div>
-
-<div class="grid">
-
-  <!-- AUTH CARD -->
-  <div class="card">
-    <h2>Authentication</h2>
-    <div class="tabs">
-      <button id="tabRegisterBtn" class="active" onclick="switchAuthTab('register')">Register</button>
-      <button id="tabLoginBtn" onclick="switchAuthTab('login')">Login</button>
+  <head>
+    <meta charset="UTF-8" />
+    <title>FairBloom — API Test Dashboard</title>
+    <style>
+      :root {
+        --pink: #d6336c;
+        --green: #2f9e44;
+        --bg: #faf7f5;
+        --card: #ffffff;
+        --border: #e5dfda;
+        --text: #2b2b2b;
+        --muted: #7a7a7a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      .subtitle {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 20px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 16px;
+        align-items: start;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .card h2 {
+        font-size: 15px;
+        margin: 0 0 12px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 10px 0 4px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 7px 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      button {
+        margin-top: 12px;
+        padding: 8px 14px;
+        border: none;
+        border-radius: 6px;
+        background: var(--pink);
+        color: white;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #555;
+      }
+      button.small {
+        padding: 4px 8px;
+        font-size: 12px;
+        margin: 2px 4px 2px 0;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .tabs button {
+        background: #eee;
+        color: #333;
+        margin: 0;
+      }
+      .tabs button.active {
+        background: var(--pink);
+        color: white;
+      }
+      pre {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        max-height: 160px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .session-bar {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 16px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .badge.farmer {
+        background: #ebfbee;
+        color: var(--green);
+      }
+      .badge.buyer {
+        background: #fff0f6;
+        color: var(--pink);
+      }
+      .badge.admin {
+        background: #e7f5ff;
+        color: #1971c2;
+      }
+      .badge.none {
+        background: #f1f3f5;
+        color: var(--muted);
+      }
+      .listing-row {
+        border-bottom: 1px solid var(--border);
+        padding: 8px 0;
+        font-size: 13px;
+      }
+      .listing-row:last-child {
+        border-bottom: none;
+      }
+      .listing-meta {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🌸 FairBloom — API Test Dashboard</h1>
+    <div class="subtitle">
+      Local testing UI for the auth + listings routes. Talks to this same server's /api endpoints.
     </div>
 
-    <!-- REGISTER -->
-    <div id="registerForm">
-      <label>Name</label>
-      <input id="regName" placeholder="Juan Dela Cruz" />
-
-      <label>Email</label>
-      <input id="regEmail" placeholder="juan@test.com" />
-
-      <label>Password</label>
-      <input id="regPassword" type="password" placeholder="At least 6 characters" />
-
-      <label>Phone (optional)</label>
-      <input id="regPhone" placeholder="0917xxxxxxx" />
-
-      <label>Role</label>
-      <select id="regRole" onchange="toggleRoleFields()">
-        <option value="farmer">Farmer</option>
-        <option value="buyer">Buyer</option>
-      </select>
-
-      <div id="farmerFields">
-        <label>Farm Location</label>
-        <select id="regFarmLocation">
-          <option>Beckel</option>
-          <option>Bahong</option>
-          <option>Ambiong</option>
-          <option>Bineng</option>
-          <option>Tublay</option>
-          <option>Sablan</option>
-        </select>
+    <div class="session-bar">
+      <div id="sessionInfo">Not logged in <span class="badge none">guest</span></div>
+      <div>
+        <button class="small secondary" onclick="logout()">Log out</button>
       </div>
-
-      <div id="buyerFields" class="hidden">
-        <label>Buyer Category</label>
-        <select id="regBuyerCategory">
-          <option>Retail Florist</option>
-          <option>Funeral Home</option>
-          <option>Church/Institution</option>
-        </select>
-        <label>Business Location</label>
-        <select id="regBusinessLocation">
-          <option>Baguio City</option>
-          <option>La Trinidad</option>
-        </select>
-      </div>
-
-      <button onclick="register()">Register & Log In</button>
     </div>
 
-    <!-- LOGIN -->
-    <div id="loginForm" class="hidden">
-      <label>Email</label>
-      <input id="loginEmail" placeholder="juan@test.com" />
-      <label>Password</label>
-      <input id="loginPassword" type="password" placeholder="Password" />
-      <button onclick="login()">Log In</button>
-    </div>
+    <div class="grid">
+      <!-- AUTH CARD -->
+      <div class="card">
+        <h2>Authentication</h2>
+        <div class="tabs">
+          <button id="tabRegisterBtn" class="active" onclick="switchAuthTab('register')">
+            Register
+          </button>
+          <button id="tabLoginBtn" onclick="switchAuthTab('login')">Login</button>
+        </div>
 
-    <pre id="authOutput">Response will appear here…</pre>
-  </div>
+        <!-- REGISTER -->
+        <div id="registerForm">
+          <label>Name</label>
+          <input id="regName" placeholder="Juan Dela Cruz" />
 
-  <!-- CREATE LISTING CARD -->
-  <div class="card">
-    <h2>Create Listing</h2>
-    <div class="subtitle" id="createListingHint">Log in as a farmer or buyer to create a listing.</div>
+          <label>Email</label>
+          <input id="regEmail" placeholder="juan@test.com" />
 
-    <label>Flower Variety</label>
-    <input id="listVariety" placeholder="Roses" />
+          <label>Password</label>
+          <input id="regPassword" type="password" placeholder="At least 6 characters" />
 
-    <label>Quantity (dozens)</label>
-    <input id="listQuantity" type="number" min="1" value="10" />
+          <label>Phone (optional)</label>
+          <input id="regPhone" placeholder="0917xxxxxxx" />
 
-    <label>Price per Unit (₱, optional)</label>
-    <input id="listPrice" type="number" min="0" placeholder="e.g. 30" />
+          <label>Role</label>
+          <select id="regRole" onchange="toggleRoleFields()">
+            <option value="farmer">Farmer</option>
+            <option value="buyer">Buyer</option>
+          </select>
 
-    <label>Location</label>
-    <select id="listLocation">
-      <option>Beckel</option>
-      <option>Bahong</option>
-      <option>Ambiong</option>
-      <option>Bineng</option>
-      <option>Tublay</option>
-      <option>Sablan</option>
-      <option>Baguio City</option>
-      <option>La Trinidad</option>
-    </select>
+          <div id="farmerFields">
+            <label>Farm Location</label>
+            <select id="regFarmLocation">
+              <option>Beckel</option>
+              <option>Bahong</option>
+              <option>Ambiong</option>
+              <option>Bineng</option>
+              <option>Tublay</option>
+              <option>Sablan</option>
+            </select>
+          </div>
 
-    <label>Description (optional)</label>
-    <textarea id="listDescription" rows="2" placeholder="Fresh cut, harvested this morning"></textarea>
+          <div id="buyerFields" class="hidden">
+            <label>Buyer Category</label>
+            <select id="regBuyerCategory">
+              <option>Retail Florist</option>
+              <option>Funeral Home</option>
+              <option>Church/Institution</option>
+            </select>
+            <label>Business Location</label>
+            <select id="regBusinessLocation">
+              <option>Baguio City</option>
+              <option>La Trinidad</option>
+            </select>
+          </div>
 
-    <button onclick="createListing()">Create Listing</button>
+          <button onclick="register()">Register & Log In</button>
+        </div>
 
-    <pre id="createOutput">Response will appear here…</pre>
-  </div>
+        <!-- LOGIN -->
+        <div id="loginForm" class="hidden">
+          <label>Email</label>
+          <input id="loginEmail" placeholder="juan@test.com" />
+          <label>Password</label>
+          <input id="loginPassword" type="password" placeholder="Password" />
+          <button onclick="login()">Log In</button>
+        </div>
 
-  <!-- BROWSE LISTINGS CARD -->
-  <div class="card" style="grid-column: 1 / -1;">
-    <h2>Browse / Search Listings</h2>
-
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <div style="flex:1; min-width:140px;">
-        <label>Flower variety</label>
-        <input id="filterVariety" placeholder="e.g. rose" />
+        <pre id="authOutput">Response will appear here…</pre>
       </div>
-      <div style="flex:1; min-width:140px;">
+
+      <!-- CREATE LISTING CARD -->
+      <div class="card">
+        <h2>Create Listing</h2>
+        <div class="subtitle" id="createListingHint">
+          Log in as a farmer or buyer to create a listing.
+        </div>
+
+        <label>Flower Variety</label>
+        <input id="listVariety" placeholder="Roses" />
+
+        <label>Quantity (dozens)</label>
+        <input id="listQuantity" type="number" min="1" value="10" />
+
+        <label>Price per Unit (₱, optional)</label>
+        <input id="listPrice" type="number" min="0" placeholder="e.g. 30" />
+
         <label>Location</label>
-        <select id="filterLocation">
-          <option value="">Any</option>
+        <select id="listLocation">
           <option>Beckel</option>
           <option>Bahong</option>
           <option>Ambiong</option>
@@ -247,168 +271,203 @@
           <option>Baguio City</option>
           <option>La Trinidad</option>
         </select>
+
+        <label>Description (optional)</label>
+        <textarea
+          id="listDescription"
+          rows="2"
+          placeholder="Fresh cut, harvested this morning"
+        ></textarea>
+
+        <button onclick="createListing()">Create Listing</button>
+
+        <pre id="createOutput">Response will appear here…</pre>
       </div>
-      <div style="flex:1; min-width:140px;">
-        <label>Type</label>
-        <select id="filterType">
-          <option value="">Any</option>
-          <option value="sell">Sell (farmer)</option>
-          <option value="request">Request (buyer)</option>
-        </select>
-      </div>
-      <div style="flex:1; min-width:140px;">
-        <label>Status</label>
-        <select id="filterStatus">
-          <option value="active">Active</option>
-          <option value="fulfilled">Fulfilled</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="">Any</option>
-        </select>
+
+      <!-- BROWSE LISTINGS CARD -->
+      <div class="card" style="grid-column: 1 / -1">
+        <h2>Browse / Search Listings</h2>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <div style="flex: 1; min-width: 140px">
+            <label>Flower variety</label>
+            <input id="filterVariety" placeholder="e.g. rose" />
+          </div>
+          <div style="flex: 1; min-width: 140px">
+            <label>Location</label>
+            <select id="filterLocation">
+              <option value="">Any</option>
+              <option>Beckel</option>
+              <option>Bahong</option>
+              <option>Ambiong</option>
+              <option>Bineng</option>
+              <option>Tublay</option>
+              <option>Sablan</option>
+              <option>Baguio City</option>
+              <option>La Trinidad</option>
+            </select>
+          </div>
+          <div style="flex: 1; min-width: 140px">
+            <label>Type</label>
+            <select id="filterType">
+              <option value="">Any</option>
+              <option value="sell">Sell (farmer)</option>
+              <option value="request">Request (buyer)</option>
+            </select>
+          </div>
+          <div style="flex: 1; min-width: 140px">
+            <label>Status</label>
+            <select id="filterStatus">
+              <option value="active">Active</option>
+              <option value="fulfilled">Fulfilled</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="">Any</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="browseListings()">Search</button>
+
+        <div id="listingsResults" style="margin-top: 14px">No results yet — click Search.</div>
       </div>
     </div>
-    <button onclick="browseListings()">Search</button>
 
-    <div id="listingsResults" style="margin-top:14px;">No results yet — click Search.</div>
-  </div>
+    <script>
+      const API = ""; // same-origin, since this file is served by the Express app
+      let token = localStorage.getItem("fb_token") || null;
+      let currentUser = JSON.parse(localStorage.getItem("fb_user") || "null");
 
-</div>
+      function renderSession() {
+        const el = document.getElementById("sessionInfo");
+        if (currentUser) {
+          el.innerHTML = `Logged in as <strong>${currentUser.name}</strong> (${currentUser.email}) <span class="badge ${currentUser.role}">${currentUser.role}</span>`;
+          document.getElementById("createListingHint").textContent =
+            currentUser.role === "farmer"
+              ? "You'll create a SELL listing."
+              : currentUser.role === "buyer"
+                ? "You'll create a REQUEST listing."
+                : "Admins can't create listings.";
+        } else {
+          el.innerHTML = `Not logged in <span class="badge none">guest</span>`;
+          document.getElementById("createListingHint").textContent =
+            "Log in as a farmer or buyer to create a listing.";
+        }
+      }
 
-<script>
-  const API = ""; // same-origin, since this file is served by the Express app
-  let token = localStorage.getItem("fb_token") || null;
-  let currentUser = JSON.parse(localStorage.getItem("fb_user") || "null");
+      function logout() {
+        token = null;
+        currentUser = null;
+        localStorage.removeItem("fb_token");
+        localStorage.removeItem("fb_user");
+        renderSession();
+      }
 
-  function renderSession() {
-    const el = document.getElementById("sessionInfo");
-    if (currentUser) {
-      el.innerHTML = `Logged in as <strong>${currentUser.name}</strong> (${currentUser.email}) <span class="badge ${currentUser.role}">${currentUser.role}</span>`;
-      document.getElementById("createListingHint").textContent =
-        currentUser.role === "farmer"
-          ? "You'll create a SELL listing."
-          : currentUser.role === "buyer"
-          ? "You'll create a REQUEST listing."
-          : "Admins can't create listings.";
-    } else {
-      el.innerHTML = `Not logged in <span class="badge none">guest</span>`;
-      document.getElementById("createListingHint").textContent = "Log in as a farmer or buyer to create a listing.";
-    }
-  }
+      function switchAuthTab(tab) {
+        document.getElementById("registerForm").classList.toggle("hidden", tab !== "register");
+        document.getElementById("loginForm").classList.toggle("hidden", tab !== "login");
+        document.getElementById("tabRegisterBtn").classList.toggle("active", tab === "register");
+        document.getElementById("tabLoginBtn").classList.toggle("active", tab === "login");
+      }
 
-  function logout() {
-    token = null;
-    currentUser = null;
-    localStorage.removeItem("fb_token");
-    localStorage.removeItem("fb_user");
-    renderSession();
-  }
+      function toggleRoleFields() {
+        const role = document.getElementById("regRole").value;
+        document.getElementById("farmerFields").classList.toggle("hidden", role !== "farmer");
+        document.getElementById("buyerFields").classList.toggle("hidden", role !== "buyer");
+      }
 
-  function switchAuthTab(tab) {
-    document.getElementById("registerForm").classList.toggle("hidden", tab !== "register");
-    document.getElementById("loginForm").classList.toggle("hidden", tab !== "login");
-    document.getElementById("tabRegisterBtn").classList.toggle("active", tab === "register");
-    document.getElementById("tabLoginBtn").classList.toggle("active", tab === "login");
-  }
+      async function apiCall(path, method = "GET", body = null, useAuth = false) {
+        const headers = { "Content-Type": "application/json" };
+        if (useAuth && token) headers["Authorization"] = "Bearer " + token;
 
-  function toggleRoleFields() {
-    const role = document.getElementById("regRole").value;
-    document.getElementById("farmerFields").classList.toggle("hidden", role !== "farmer");
-    document.getElementById("buyerFields").classList.toggle("hidden", role !== "buyer");
-  }
+        const res = await fetch(API + path, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        const data = await res.json().catch(() => ({}));
+        return { ok: res.ok, status: res.status, data };
+      }
 
-  async function apiCall(path, method = "GET", body = null, useAuth = false) {
-    const headers = { "Content-Type": "application/json" };
-    if (useAuth && token) headers["Authorization"] = "Bearer " + token;
+      async function register() {
+        const role = document.getElementById("regRole").value;
+        const payload = {
+          name: document.getElementById("regName").value,
+          email: document.getElementById("regEmail").value,
+          password: document.getElementById("regPassword").value,
+          phone: document.getElementById("regPhone").value,
+          role,
+        };
+        if (role === "farmer") {
+          payload.farmLocation = document.getElementById("regFarmLocation").value;
+        } else {
+          payload.buyerCategory = document.getElementById("regBuyerCategory").value;
+          payload.businessLocation = document.getElementById("regBusinessLocation").value;
+        }
 
-    const res = await fetch(API + path, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data };
-  }
+        const { ok, data } = await apiCall("/api/auth/register", "POST", payload);
+        document.getElementById("authOutput").textContent = JSON.stringify(data, null, 2);
+        if (ok) saveSession(data);
+      }
 
-  async function register() {
-    const role = document.getElementById("regRole").value;
-    const payload = {
-      name: document.getElementById("regName").value,
-      email: document.getElementById("regEmail").value,
-      password: document.getElementById("regPassword").value,
-      phone: document.getElementById("regPhone").value,
-      role,
-    };
-    if (role === "farmer") {
-      payload.farmLocation = document.getElementById("regFarmLocation").value;
-    } else {
-      payload.buyerCategory = document.getElementById("regBuyerCategory").value;
-      payload.businessLocation = document.getElementById("regBusinessLocation").value;
-    }
+      async function login() {
+        const payload = {
+          email: document.getElementById("loginEmail").value,
+          password: document.getElementById("loginPassword").value,
+        };
+        const { ok, data } = await apiCall("/api/auth/login", "POST", payload);
+        document.getElementById("authOutput").textContent = JSON.stringify(data, null, 2);
+        if (ok) saveSession(data);
+      }
 
-    const { ok, data } = await apiCall("/api/auth/register", "POST", payload);
-    document.getElementById("authOutput").textContent = JSON.stringify(data, null, 2);
-    if (ok) saveSession(data);
-  }
+      function saveSession(data) {
+        token = data.token;
+        currentUser = data.user;
+        localStorage.setItem("fb_token", token);
+        localStorage.setItem("fb_user", JSON.stringify(currentUser));
+        renderSession();
+      }
 
-  async function login() {
-    const payload = {
-      email: document.getElementById("loginEmail").value,
-      password: document.getElementById("loginPassword").value,
-    };
-    const { ok, data } = await apiCall("/api/auth/login", "POST", payload);
-    document.getElementById("authOutput").textContent = JSON.stringify(data, null, 2);
-    if (ok) saveSession(data);
-  }
+      async function createListing() {
+        if (!currentUser) {
+          document.getElementById("createOutput").textContent = "Log in first.";
+          return;
+        }
+        const type = currentUser.role === "farmer" ? "sell" : "request";
+        const payload = {
+          type,
+          flowerVariety: document.getElementById("listVariety").value,
+          quantity: Number(document.getElementById("listQuantity").value),
+          location: document.getElementById("listLocation").value,
+          description: document.getElementById("listDescription").value,
+        };
+        const priceVal = document.getElementById("listPrice").value;
+        if (priceVal) payload.pricePerUnit = Number(priceVal);
 
-  function saveSession(data) {
-    token = data.token;
-    currentUser = data.user;
-    localStorage.setItem("fb_token", token);
-    localStorage.setItem("fb_user", JSON.stringify(currentUser));
-    renderSession();
-  }
+        const { data } = await apiCall("/api/listings", "POST", payload, true);
+        document.getElementById("createOutput").textContent = JSON.stringify(data, null, 2);
+      }
 
-  async function createListing() {
-    if (!currentUser) {
-      document.getElementById("createOutput").textContent = "Log in first.";
-      return;
-    }
-    const type = currentUser.role === "farmer" ? "sell" : "request";
-    const payload = {
-      type,
-      flowerVariety: document.getElementById("listVariety").value,
-      quantity: Number(document.getElementById("listQuantity").value),
-      location: document.getElementById("listLocation").value,
-      description: document.getElementById("listDescription").value,
-    };
-    const priceVal = document.getElementById("listPrice").value;
-    if (priceVal) payload.pricePerUnit = Number(priceVal);
+      async function browseListings() {
+        const params = new URLSearchParams();
+        const variety = document.getElementById("filterVariety").value;
+        const location = document.getElementById("filterLocation").value;
+        const type = document.getElementById("filterType").value;
+        const status = document.getElementById("filterStatus").value;
+        if (variety) params.set("flowerVariety", variety);
+        if (location) params.set("location", location);
+        if (type) params.set("type", type);
+        if (status) params.set("status", status);
 
-    const { data } = await apiCall("/api/listings", "POST", payload, true);
-    document.getElementById("createOutput").textContent = JSON.stringify(data, null, 2);
-  }
+        const { data } = await apiCall("/api/listings?" + params.toString());
+        const container = document.getElementById("listingsResults");
 
-  async function browseListings() {
-    const params = new URLSearchParams();
-    const variety = document.getElementById("filterVariety").value;
-    const location = document.getElementById("filterLocation").value;
-    const type = document.getElementById("filterType").value;
-    const status = document.getElementById("filterStatus").value;
-    if (variety) params.set("flowerVariety", variety);
-    if (location) params.set("location", location);
-    if (type) params.set("type", type);
-    if (status) params.set("status", status);
+        if (!data.listings || data.listings.length === 0) {
+          container.innerHTML = "No listings found.";
+          return;
+        }
 
-    const { data } = await apiCall("/api/listings?" + params.toString());
-    const container = document.getElementById("listingsResults");
-
-    if (!data.listings || data.listings.length === 0) {
-      container.innerHTML = "No listings found.";
-      return;
-    }
-
-    container.innerHTML = data.listings
-      .map(
-        (l) => `
+        container.innerHTML = data.listings
+          .map(
+            (l) => `
       <div class="listing-row">
         <strong>${l.flowerVariety}</strong> — ${l.quantity} dozen
         ${l.pricePerUnit ? `— ₱${l.pricePerUnit}/unit` : ""}
@@ -420,15 +479,14 @@
         </div>
         ${l.description ? `<div class="listing-meta">"${l.description}"</div>` : ""}
       </div>`
-      )
-      .join("");
-  }
+          )
+          .join("");
+      }
 
-  // init
-  toggleRoleFields();
-  renderSession();
-  browseListings();
-</script>
-
-</body>
+      // init
+      toggleRoleFields();
+      renderSession();
+      browseListings();
+    </script>
+  </body>
 </html>

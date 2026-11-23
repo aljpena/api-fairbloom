@@ -68,8 +68,8 @@ async function createTransaction({
     flaggedForReview,
     status,
   });
-  
-    if (flaggedForReview) {
+
+  if (flaggedForReview) {
     notifyAdmins({
       type: "transaction_flagged",
       title: "Transaction needs review",

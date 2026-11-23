@@ -45,9 +45,13 @@ async function eraseUser(userId, { transactions, source = "admin", skipLedger = 
   }
 
   const involved = { $or: [{ submittedBy: userId }, { farmer: userId }, { buyer: userId }] };
-  const convoIds = (await Conversation.find({ participants: userId }).select("_id").lean()).map((c) => c._id);
+  const convoIds = (await Conversation.find({ participants: userId }).select("_id").lean()).map(
+    (c) => c._id
+  );
   const dealIds = (
-    await Deal.find({ $or: [{ farmer: userId }, { buyer: userId }] }).select("_id").lean()
+    await Deal.find({ $or: [{ farmer: userId }, { buyer: userId }] })
+      .select("_id")
+      .lean()
   ).map((d) => d._id);
 
   const report = {};
@@ -89,7 +93,9 @@ async function eraseUser(userId, { transactions, source = "admin", skipLedger = 
   report.messagesDeleted = (
     await Message.deleteMany({ $or: [{ conversation: { $in: convoIds } }, { sender: userId }] })
   ).deletedCount;
-  report.conversationsDeleted = (await Conversation.deleteMany({ _id: { $in: convoIds } })).deletedCount;
+  report.conversationsDeleted = (
+    await Conversation.deleteMany({ _id: { $in: convoIds } })
+  ).deletedCount;
   report.listingsDeleted = (await Listing.deleteMany({ postedBy: userId })).deletedCount;
   await User.deleteOne({ _id: userId });
   report.accountDeleted = true;
@@ -102,19 +108,29 @@ async function eraseUser(userId, { transactions, source = "admin", skipLedger = 
  * Wipes ALL participant data and keeps admin accounts. Use after UAT.
  */
 async function purgeAllParticipantData() {
-  const [users, listings, transactions, conversations, messages, deals, erasures, files, notifications, tokens] =
-    await Promise.all([
-      User.deleteMany({ role: { $ne: "admin" } }),
-      Listing.deleteMany({}),
-      Transaction.deleteMany({}),
-      Conversation.deleteMany({}),
-      Message.deleteMany({}),
-      Deal.deleteMany({}),
-      Erasure.deleteMany({}),
-      File.deleteMany({}),
-      Notification.deleteMany({}),
-      PushToken.deleteMany({}),
-    ]);
+  const [
+    users,
+    listings,
+    transactions,
+    conversations,
+    messages,
+    deals,
+    erasures,
+    files,
+    notifications,
+    tokens,
+  ] = await Promise.all([
+    User.deleteMany({ role: { $ne: "admin" } }),
+    Listing.deleteMany({}),
+    Transaction.deleteMany({}),
+    Conversation.deleteMany({}),
+    Message.deleteMany({}),
+    Deal.deleteMany({}),
+    Erasure.deleteMany({}),
+    File.deleteMany({}),
+    Notification.deleteMany({}),
+    PushToken.deleteMany({}),
+  ]);
 
   return {
     users: users.deletedCount,

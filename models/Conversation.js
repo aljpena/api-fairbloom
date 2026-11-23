@@ -2,9 +2,7 @@ const mongoose = require("mongoose");
 
 const conversationSchema = new mongoose.Schema(
   {
-    participants: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    ],
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }],
 
     // Optional: which listing sparked this conversation (e.g. buyer clicked
     // "negotiate" on a farmer's rose listing). Not required — two people
